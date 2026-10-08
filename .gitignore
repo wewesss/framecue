@@ -1,0 +1,10 @@
+node_modules
+dist
+.framecue
+*.log
+.DS_Store
+
+.rebase/
+.claude/
+CLAUDE.md
+BRIEF.md
