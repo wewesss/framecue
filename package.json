@@ -18,6 +18,7 @@
     "dev": "vite",
     "build": "vite build",
     "start": "bun src/cli.ts",
+    "dev:server": "bun src/cli.ts --no-open --dev",
     "check": "biome check .",
     "format": "biome check --write .",
     "typecheck": "tsc --noEmit",
