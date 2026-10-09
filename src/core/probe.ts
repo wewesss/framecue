@@ -10,6 +10,9 @@ interface ProbeStream {
   r_frame_rate?: string;
   nb_frames?: string;
   duration?: string;
+  sample_rate?: string;
+  channels?: number;
+  channel_layout?: string;
 }
 
 function parseFraction(value: string | undefined): number {
@@ -29,6 +32,8 @@ async function ffprobe(args: string[]): Promise<string> {
   return res.stdout;
 }
 
+const REORDER_TAIL = 16;
+
 async function packetsLookIrregular(path: string): Promise<boolean> {
   const out = await ffprobe([
     "-select_streams",
@@ -45,7 +50,9 @@ async function packetsLookIrregular(path: string): Promise<boolean> {
     .split(/\r?\n/)
     .map((l) => Number.parseFloat(l.split(",")[0] ?? ""))
     .filter((n) => Number.isFinite(n))
-    .sort((a, b) => a - b);
+    .sort((a, b) => a - b)
+    // Reading stops mid-GOP in decode order, so the last reordered (B-frame) timestamps are missing.
+    .slice(0, -REORDER_TAIL);
   const deltas: number[] = [];
   for (let i = 1; i < times.length; i++) {
     deltas.push((times[i] as number) - (times[i - 1] as number));
@@ -58,18 +65,11 @@ async function packetsLookIrregular(path: string): Promise<boolean> {
 }
 
 export async function probeVideo(path: string): Promise<VideoInfo> {
-  const raw = await ffprobe([
-    "-select_streams",
-    "v:0",
-    "-show_streams",
-    "-show_format",
-    "-of",
-    "json",
-    path,
-  ]);
+  const raw = await ffprobe(["-show_streams", "-show_format", "-of", "json", path]);
   const data = JSON.parse(raw) as { streams?: ProbeStream[]; format?: { duration?: string } };
   const stream = data.streams?.find((s) => s.codec_type === "video");
   if (!stream) throw new Error(`No video stream found in ${path}`);
+  const audioStream = data.streams?.find((s) => s.codec_type === "audio");
 
   const avg = parseFraction(stream.avg_frame_rate);
   const rate = parseFraction(stream.r_frame_rate);
@@ -109,5 +109,13 @@ export async function probeVideo(path: string): Promise<VideoInfo> {
     durationSec: Number.isFinite(durationSec) ? durationSec : frameCount / fps,
     codec: stream.codec_name ?? "unknown",
     vfr,
+    audio: audioStream
+      ? {
+          codec: audioStream.codec_name ?? "unknown",
+          sampleRate: Number.parseInt(audioStream.sample_rate ?? "", 10) || 0,
+          channels: audioStream.channels ?? 0,
+          channelLayout: audioStream.channel_layout || null,
+        }
+      : null,
   };
 }

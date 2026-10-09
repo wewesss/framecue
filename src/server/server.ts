@@ -1,12 +1,14 @@
 import { extname, join, normalize, resolve } from "node:path";
 import { matcher, P } from "matchigo";
 import {
+  computePeaks,
   createItem,
   deleteItem,
   type Item,
   type ItemKind,
   type ItemPatch,
   type ItemStatus,
+  type Peaks,
   probeVideo,
   type Region,
   readQueue,
@@ -59,6 +61,7 @@ export interface RunningServer {
 }
 
 interface Ctx {
+  peaks: () => Promise<Peaks | null>;
   method: string;
   parts: string[];
   request: Request;
@@ -195,6 +198,19 @@ function streamVideo({ request, info }: Ctx): Response {
   });
 }
 
+async function serveAudioPeaks({ peaks }: Ctx): Promise<Response> {
+  const result = await peaks();
+  if (!result) fail(404, "No audio track");
+  return new Response(result.data.slice().buffer, {
+    headers: {
+      "Content-Type": "application/octet-stream",
+      "X-Peaks-Rate": String(result.rate),
+      "X-Peaks-Length": String(result.length),
+      "Cache-Control": "no-store",
+    },
+  });
+}
+
 async function listItems({ url, workspace }: Ctx): Promise<Response> {
   const status = parseStatus(url.searchParams.get("status"));
   const items = await readQueue(workspace);
@@ -225,7 +241,7 @@ async function postItem({ request, info, sha256, workspace }: Ctx): Promise<Resp
 
 async function patchItem({ request, parts, workspace }: Ctx): Promise<Response> {
   const patch = parsePatch(await readBody(request));
-  return json(await updateItem(workspace, parts[2] as string, patch));
+  return json(await updateItem(workspace, parts[2] as string, patch, { actor: "user" }));
 }
 
 async function removeItem({ parts, workspace }: Ctx): Promise<Response> {
@@ -257,6 +273,7 @@ const dispatch = matcher<Ctx, Response | Promise<Response>>()
   .with({ method: "GET", parts: P.tuple("api", "health") }, () => json({ ok: true }))
   .with({ method: "GET", parts: P.tuple("api", "video") }, videoInfo)
   .with({ method: "GET", parts: P.tuple("api", "video", "stream") }, streamVideo)
+  .with({ method: "GET", parts: P.tuple("api", "audio", "peaks") }, serveAudioPeaks)
   .with({ method: "GET", parts: P.tuple("api", "items") }, listItems)
   .with({ method: "POST", parts: P.tuple("api", "items") }, postItem)
   .with({ method: "POST", parts: P.tuple("api", "items", "reorder") }, reorderItems)
@@ -325,6 +342,15 @@ export async function startServer({
   const { root: workspace } = await resolveWorkspace(videoPath, workspaceDir);
   const sha256 = await sha256File(videoPath);
 
+  let peaksInFlight: Promise<Peaks | null> | null = null;
+  const peaks = () => {
+    if (info.audio === null) return Promise.resolve(null);
+    peaksInFlight ??= computePeaks(info.path, { workspace, sha256 }).finally(() => {
+      peaksInFlight = null;
+    });
+    return peaksInFlight;
+  };
+
   let boundPort = 0;
 
   const hostAllowed = (host: string | null) =>
@@ -346,7 +372,7 @@ export async function startServer({
     const url = new URL(request.url);
     const parts = decodeParts(url.pathname);
     if (!parts) return json({ error: "Invalid path" }, 400);
-    const ctx: Ctx = { method, parts, request, url, info, sha256, workspace };
+    const ctx: Ctx = { peaks, method, parts, request, url, info, sha256, workspace };
     try {
       return await dispatch(ctx);
     } catch (error) {

@@ -13,6 +13,8 @@ const TRANSITIONS: Record<ItemStatus, ItemStatus[]> = {
   verified: ["reopened"],
 };
 
+export type Actor = "user" | "agent";
+
 export function canTransition(from: ItemStatus, to: ItemStatus): boolean {
   return from === to || TRANSITIONS[from].includes(to);
 }
@@ -139,12 +141,21 @@ export interface ItemPatch {
   region?: Region | null;
 }
 
-export function updateItem(root: string, id: string, patch: ItemPatch): Promise<Item> {
+export function updateItem(
+  root: string,
+  id: string,
+  patch: ItemPatch,
+  { actor }: { actor: Actor } = { actor: "user" },
+): Promise<Item> {
   return withLock(root, async () => {
     const items = await readQueue(root);
     const item = items.find((it) => it.id === id);
     if (!item) throw new Error(`Item not found: ${id}`);
-    if (patch.status !== undefined && !canTransition(item.status, patch.status)) {
+    if (
+      actor === "agent" &&
+      patch.status !== undefined &&
+      !(patch.status === "fixed" && (item.status === "todo" || item.status === "reopened"))
+    ) {
       throw new Error(`Invalid status transition: ${item.status} -> ${patch.status}`);
     }
     if (patch.region) validateRegion(patch.region);

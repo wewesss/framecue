@@ -37,4 +37,12 @@ export interface VideoInfo {
   durationSec: number;
   codec: string;
   vfr: boolean;
+  audio: AudioInfo | null;
+}
+
+export interface AudioInfo {
+  codec: string;
+  sampleRate: number;
+  channels: number;
+  channelLayout: string | null;
 }

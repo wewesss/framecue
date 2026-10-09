@@ -20,11 +20,57 @@ describe("probeVideo", () => {
     expect(info.height).toBe(90);
     expect(info.codec).toBe("h264");
     expect(info.vfr).toBe(false);
+    expect(info.audio).toEqual({
+      codec: "aac",
+      sampleRate: 48000,
+      channels: 1,
+      channelLayout: "mono",
+    });
+  });
+
+  test("clip without audio has audio null", async () => {
+    expect((await probeVideo(fx.silent)).audio).toBeNull();
   });
 
   test("VFR clip is flagged", async () => {
     const info = await probeVideo(fx.vfr);
     expect(info.vfr).toBe(true);
+  });
+
+  test("long CFR clip with B-frames and audio is not flagged VFR", async () => {
+    const path = `${fx.dir}/long-bframes.mp4`;
+    const ff = Bun.spawn(
+      [
+        "ffmpeg",
+        "-v",
+        "error",
+        "-y",
+        "-f",
+        "lavfi",
+        "-i",
+        "testsrc2=size=160x90:rate=25",
+        "-f",
+        "lavfi",
+        "-i",
+        "sine=frequency=330:sample_rate=48000",
+        "-t",
+        "20",
+        "-c:v",
+        "libx264",
+        "-bf",
+        "3",
+        "-pix_fmt",
+        "yuv420p",
+        "-c:a",
+        "aac",
+        path,
+      ],
+      { stderr: "pipe" },
+    );
+    expect(await ff.exited).toBe(0);
+    const info = await probeVideo(path);
+    expect(info.frameCount).toBe(500);
+    expect(info.vfr).toBe(false);
   });
 
   test("missing file throws", async () => {

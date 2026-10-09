@@ -88,6 +88,42 @@ describe("video", () => {
   });
 });
 
+describe("audio peaks", () => {
+  test("returns int8 peaks with headers", async () => {
+    const res = await send("GET", "/api/audio/peaks");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("application/octet-stream");
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    expect(res.headers.get("x-peaks-rate")).toBe("200");
+    const length = Number(res.headers.get("x-peaks-length"));
+    expect((await res.arrayBuffer()).byteLength).toBe(length * 2);
+    expect(length).toBeGreaterThan(390);
+  });
+
+  test("concurrent requests agree", async () => {
+    const [a, b] = await Promise.all([
+      send("GET", "/api/audio/peaks"),
+      send("GET", "/api/audio/peaks"),
+    ]);
+    expect(a.headers.get("x-peaks-length")).toBe(b.headers.get("x-peaks-length"));
+  });
+
+  test("404 without audio track", async () => {
+    const silent = await startServer({
+      videoPath: fx.silent,
+      workspaceDir: join(wsDir, "s"),
+      port: 0,
+    });
+    try {
+      const res = await fetch(`${silent.url}/api/audio/peaks`);
+      expect(res.status).toBe(404);
+      expect(await res.json()).toEqual({ error: "No audio track" });
+    } finally {
+      silent.stop();
+    }
+  });
+});
+
 describe("items", () => {
   let item: Item;
 
@@ -128,9 +164,13 @@ describe("items", () => {
     expect(((await res.json()) as Item).comment).toBe("b");
   });
 
-  test("invalid transition is 409", async () => {
+  test("user may set any status", async () => {
     const res = await send("PATCH", `/api/items/${item.id}`, { status: "verified" });
-    expect(res.status).toBe(409);
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as Item).status).toBe("verified");
+    const back = await send("PATCH", `/api/items/${item.id}`, { status: "todo" });
+    expect(((await back.json()) as Item).status).toBe("todo");
+    expect((await send("PATCH", `/api/items/${item.id}`, { status: "nope" })).status).toBe(400);
   });
 
   test("reorder", async () => {

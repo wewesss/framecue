@@ -110,16 +110,24 @@ describe("queue", () => {
       comment: "c",
       sha256: sha,
     });
-    await expect(updateItem(root, it.id, { status: "verified" })).rejects.toThrow();
-    await expect(updateItem(root, it.id, { status: "reopened" })).rejects.toThrow();
-    expect((await updateItem(root, it.id, { status: "todo" })).status).toBe("todo");
-    const fixed = await updateItem(root, it.id, { status: "fixed", agentNote: "done" });
+    const agent = { actor: "agent" } as const;
+    await expect(updateItem(root, it.id, { status: "verified" }, agent)).rejects.toThrow(
+      "Invalid status transition",
+    );
+    await expect(updateItem(root, it.id, { status: "reopened" }, agent)).rejects.toThrow();
+    await expect(updateItem(root, it.id, { status: "todo" }, agent)).rejects.toThrow();
+    const fixed = await updateItem(root, it.id, { status: "fixed", agentNote: "done" }, agent);
     expect(fixed.agentNote).toBe("done");
+    await expect(updateItem(root, it.id, { status: "fixed" }, agent)).rejects.toThrow();
+    await expect(updateItem(root, it.id, { status: "verified" }, agent)).rejects.toThrow();
     expect((await updateItem(root, it.id, { status: "reopened" })).status).toBe("reopened");
-    await updateItem(root, it.id, { status: "fixed" });
-    await updateItem(root, it.id, { status: "verified", comment: "ok" });
-    await expect(updateItem(root, it.id, { status: "fixed" })).rejects.toThrow();
-    expect((await updateItem(root, it.id, { status: "reopened" })).status).toBe("reopened");
+    expect((await updateItem(root, it.id, { status: "fixed" }, agent)).status).toBe("fixed");
+    expect((await updateItem(root, it.id, { status: "verified", comment: "ok" })).status).toBe(
+      "verified",
+    );
+    await expect(updateItem(root, it.id, { status: "fixed" }, agent)).rejects.toThrow();
+    expect((await updateItem(root, it.id, { status: "todo" })).status).toBe("todo");
+    expect((await updateItem(root, it.id, { status: "verified" })).status).toBe("verified");
     await expect(updateItem(root, "nope", { comment: "x" })).rejects.toThrow();
 
     expect(canTransition("todo", "fixed")).toBe(true);
