@@ -1,4 +1,5 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
+import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { basename, resolve } from "node:path";
 import { parseArgs } from "node:util";
@@ -31,7 +32,10 @@ function openBrowser(url: string): void {
         ? ["open", url]
         : ["xdg-open", url];
   try {
-    Bun.spawn(argv, { stdin: "ignore", stdout: "ignore", stderr: "ignore" }).unref();
+    const [file, ...args] = argv as [string, ...string[]];
+    const child = spawn(file, args, { stdio: "ignore", detached: true, windowsHide: true });
+    child.on("error", () => undefined);
+    child.unref();
   } catch {}
 }
 

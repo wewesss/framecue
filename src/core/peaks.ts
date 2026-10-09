@@ -1,5 +1,7 @@
-import { mkdir, rename } from "node:fs/promises";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { Readable } from "node:stream";
+import { exitCodeOf, spawnPiped } from "./exec";
 import { sha256File } from "./hash";
 import { probeVideo } from "./probe";
 
@@ -28,11 +30,18 @@ export const DEFAULT_PEAKS_RATE = 200;
 const SAMPLES_PER_BUCKET = 40;
 
 const defaultSpawn: PcmSpawn = (cmd) => {
-  const proc = Bun.spawn(cmd, { stdout: "pipe", stderr: "pipe", stdin: "ignore" });
+  const { child, failed } = spawnPiped(cmd);
+  const stderr = new Promise<string>((done) => {
+    const chunks: Buffer[] = [];
+    child.stderr?.on("data", (chunk: Buffer) => chunks.push(chunk));
+    child.stderr?.once("close", () => done(Buffer.concat(chunks).toString("utf8")));
+  });
+  const exited = Promise.race([exitCodeOf(child), failed]);
+  exited.catch(() => undefined);
   return {
-    stdout: proc.stdout as ReadableStream<Uint8Array>,
-    stderr: new Response(proc.stderr as ReadableStream).text(),
-    exited: proc.exited,
+    stdout: Readable.toWeb(child.stdout as Readable) as unknown as ReadableStream<Uint8Array>,
+    stderr,
+    exited,
   };
 };
 
@@ -112,9 +121,9 @@ export async function computePeaks(
   if (workspace) {
     const hash = sha256 ?? (await sha256File(videoPath));
     cacheFile = join(workspace, "cache", `peaks-${hash}-${rate}.bin`);
-    const cached = Bun.file(cacheFile);
-    if (await cached.exists()) {
-      const data = new Int8Array(await cached.arrayBuffer());
+    const cached = await readFile(cacheFile).catch(() => null);
+    if (cached) {
+      const data = new Int8Array(cached.buffer, cached.byteOffset, cached.byteLength).slice();
       return { rate, length: data.length / 2, data };
     }
   }
@@ -122,7 +131,7 @@ export async function computePeaks(
   if (peaks && cacheFile) {
     await mkdir(join(workspace as string, "cache"), { recursive: true });
     const tmp = `${cacheFile}.tmp`;
-    await Bun.write(tmp, peaks.data);
+    await writeFile(tmp, peaks.data);
     await rename(tmp, cacheFile);
   }
   return peaks;

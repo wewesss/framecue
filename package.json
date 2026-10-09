@@ -9,39 +9,51 @@
     "url": "git+https://github.com/wewesss/framecue.git"
   },
   "bin": {
-    "framecue": "src/cli.ts"
+    "framecue": "dist/cli.js"
   },
   "engines": {
-    "bun": ">=1.0.0"
+    "node": ">=20",
+    "bun": ">=1.4"
   },
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "bun run build:web && bun run build:cli",
     "start": "bun src/cli.ts",
     "dev:server": "bun src/cli.ts --no-open --dev",
     "check": "biome check .",
     "format": "biome check --write .",
     "typecheck": "tsc --noEmit",
-    "test": "bun test"
+    "test": "bun test",
+    "build:web": "vite build",
+    "build:cli": "bun build src/cli.ts --target node --format esm --packages external --outdir dist --minify-syntax",
+    "prepack": "bun run build",
+    "test:node": "node tests/node-smoke.mjs",
+    "test:bun-dist": "node tests/node-smoke.mjs --runtime bun"
   },
   "dependencies": {
-    "@miralabs-tech/icones": "^0.3.0",
     "@modelcontextprotocol/sdk": "^1.32.1",
-    "@standarx/nav": "^0.3.0",
-    "classigo": "^2.0.0",
     "matchigo": "^1.0.3",
-    "react": "^19.3.0",
-    "react-dom": "^19.3.0",
     "zod": "^4.6.5"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.15",
+    "@miralabs-tech/icones": "^0.3.0",
+    "@standarx/nav": "^0.3.0",
     "@types/bun": "^1.4.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
+    "classigo": "^2.0.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
     "sass": "^1.105.1",
     "typescript": "^7.0.2",
     "vite": "^8.3.4"
-  }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE-MIT",
+    "LICENSE-APACHE"
+  ]
 }

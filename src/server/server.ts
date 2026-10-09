@@ -1,6 +1,8 @@
-import { type FSWatcher, watch as fsWatch } from "node:fs";
-import { readFile } from "node:fs/promises";
-import { extname, join, normalize, resolve } from "node:path";
+import { existsSync, type FSWatcher, watch as fsWatch } from "node:fs";
+import { readFile, stat } from "node:fs/promises";
+import type { Server } from "node:http";
+import { dirname, extname, join, normalize, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
 import { matcher, P } from "matchigo";
 import {
   attachAfter,
@@ -34,8 +36,15 @@ import {
   updateItem,
   type VideoInfo,
 } from "../core";
+import { createHttpServer, fileBody, listenOnce } from "./http";
 
-const webRoot = resolve(import.meta.dir, "../../dist/web");
+function locateWebRoot(): string {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const candidates = [join(here, "web"), resolve(here, "../../dist/web")];
+  return candidates.find((dir) => existsSync(join(dir, "index.html"))) ?? (candidates[1] as string);
+}
+
+const webRoot = locateWebRoot();
 
 const DEFAULT_PORT = 5730;
 const PORT_ATTEMPTS = 10;
@@ -54,6 +63,36 @@ const MIME: Record<string, string> = {
   ".mov": "video/quicktime",
   ".mkv": "video/x-matroska",
 };
+
+const STATIC_MIME: Record<string, string> = {
+  ".html": "text/html; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".mjs": "text/javascript; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".map": "application/json; charset=utf-8",
+  ".svg": "image/svg+xml",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+  ".gif": "image/gif",
+  ".ico": "image/x-icon",
+  ".woff": "font/woff",
+  ".woff2": "font/woff2",
+  ".ttf": "font/ttf",
+  ".txt": "text/plain; charset=utf-8",
+  ".webmanifest": "application/manifest+json; charset=utf-8",
+};
+
+async function fileSize(path: string): Promise<number | null> {
+  try {
+    const s = await stat(path);
+    return s.isFile() ? s.size : null;
+  } catch {
+    return null;
+  }
+}
 
 const BAD_REQUEST_PREFIXES = [
   "Frames must",
@@ -78,7 +117,7 @@ export interface StartServerOptions {
 }
 
 export interface RunningServer {
-  server: Bun.Server<undefined>;
+  server: Server;
   url: string;
   readonly info: VideoInfo;
   workspace: string;
@@ -200,14 +239,16 @@ function videoInfo(c: Ctx): Response {
   return json({ ...c.info, sha256: c.sha256, workspace: c.workspace });
 }
 
-function streamVideo({ request, info }: Ctx): Response {
-  const file = Bun.file(info.path);
-  const size = file.size;
+async function streamVideo({ request, info }: Ctx): Promise<Response> {
+  const size = await fileSize(info.path);
+  if (size === null) fail(404, "Video not found");
   const type = MIME[extname(info.path).toLowerCase()] ?? "application/octet-stream";
   const base = { "Content-Type": type, "Accept-Ranges": "bytes", "Cache-Control": "no-cache" };
   const rangeHeader = request.headers.get("range");
   if (rangeHeader === null) {
-    return new Response(file, { headers: { ...base, "Content-Length": String(size) } });
+    return new Response(fileBody(info.path), {
+      headers: { ...base, "Content-Length": String(size) },
+    });
   }
   const range = parseRange(rangeHeader, size);
   if (!range) {
@@ -216,7 +257,7 @@ function streamVideo({ request, info }: Ctx): Response {
       headers: { ...base, "Content-Range": `bytes */${size}` },
     });
   }
-  return new Response(file.slice(range.start, range.end + 1), {
+  return new Response(fileBody(info.path, range.start, range.end), {
     status: 206,
     headers: {
       ...base,
@@ -337,10 +378,15 @@ async function serveFrame({ parts, workspace }: Ctx): Promise<Response> {
     rest.length <= 1 &&
     (dir === undefined || /^after-[0-9a-f]{8}$/.test(dir));
   if (!valid) fail(400, "Invalid frame path");
-  const file = Bun.file(join(workspace, "frames", id, ...(dir ? [dir] : []), name));
-  if (!(await file.exists())) fail(404, "Frame not found");
-  return new Response(file, {
-    headers: { "Content-Type": "image/png", "Cache-Control": "no-store" },
+  const path = join(workspace, "frames", id, ...(dir ? [dir] : []), name);
+  const size = await fileSize(path);
+  if (size === null) fail(404, "Frame not found");
+  return new Response(fileBody(path), {
+    headers: {
+      "Content-Type": "image/png",
+      "Content-Length": String(size),
+      "Cache-Control": "no-store",
+    },
   });
 }
 
@@ -365,18 +411,29 @@ const dispatch = matcher<Ctx, Response | Promise<Response>>()
   .with({ parts: P.when((p) => Array.isArray(p) && p[0] === "api") }, () => fail(404, "Not found"))
   .otherwise(serveStatic);
 
+async function staticFile(path: string): Promise<Response | null> {
+  const size = await fileSize(path);
+  if (size === null) return null;
+  return new Response(fileBody(path), {
+    headers: {
+      "Content-Type": STATIC_MIME[extname(path).toLowerCase()] ?? "application/octet-stream",
+      "Content-Length": String(size),
+    },
+  });
+}
+
 async function serveStatic({ method, url }: Ctx): Promise<Response> {
   if (method !== "GET" && method !== "HEAD") return new Response("Not found", { status: 404 });
   const relative = normalize(url.pathname === "/" ? "index.html" : url.pathname.slice(1));
   const target = join(webRoot, relative);
 
-  if (target.startsWith(webRoot)) {
-    const file = Bun.file(target);
-    if (await file.exists()) return new Response(file);
+  if (target.startsWith(webRoot + sep)) {
+    const response = await staticFile(target);
+    if (response) return response;
   }
 
-  const index = Bun.file(join(webRoot, "index.html"));
-  if (await index.exists()) return new Response(index);
+  const index = await staticFile(join(webRoot, "index.html"));
+  if (index) return index;
 
   return new Response("Web UI not built: run `bun run build`", {
     status: 503,
@@ -395,16 +452,18 @@ function decodeParts(pathname: string): string[] | null {
   }
 }
 
-function listen(
+async function listen(
   port: number,
-  fetch: (request: Request, server: Bun.Server<undefined>) => Promise<Response>,
-): Bun.Server<undefined> {
+  handler: (request: Request) => Promise<Response>,
+): Promise<{ server: Server; port: number }> {
   const attempts = port === 0 ? 1 : PORT_ATTEMPTS + 1;
   let last: unknown;
   for (let i = 0; i < attempts; i++) {
+    const server = createHttpServer(handler);
     try {
-      return Bun.serve({ hostname: "127.0.0.1", port: port + i, fetch });
+      return { server, port: await listenOnce(server, port + i) };
     } catch (error) {
+      server.close();
       last = error;
       if ((error as NodeJS.ErrnoException).code !== "EADDRINUSE") throw error;
     }
@@ -459,8 +518,7 @@ export async function startServer({
   };
 
   const encoder = new TextEncoder();
-  const eventStream = (request: Request, server: Bun.Server<undefined>): Response => {
-    server.timeout(request, 0);
+  const eventStream = (request: Request): Response => {
     let cleanup = () => {};
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {
@@ -586,7 +644,7 @@ export async function startServer({
     return allowed.includes(origin);
   };
 
-  const server = listen(port, async (request, bunServer) => {
+  const { server, port: listeningPort } = await listen(port, async (request) => {
     if (!hostAllowed(request.headers.get("host"))) return json({ error: "Forbidden host" }, 403);
     const method = request.method;
     const origin = request.headers.get("origin");
@@ -612,7 +670,7 @@ export async function startServer({
       info: state.info,
       sha256: state.sha256,
       workspace,
-      events: () => eventStream(request, bunServer),
+      events: () => eventStream(request),
       capture,
     };
     try {
@@ -621,7 +679,7 @@ export async function startServer({
       return errorResponse(error);
     }
   });
-  boundPort = server.port as number;
+  boundPort = listeningPort;
 
   return {
     server,
@@ -637,7 +695,8 @@ export async function startServer({
       queueUnhook?.();
       if (!renderSource) source?.close();
       for (const close of [...openStreams]) close();
-      server.stop(true);
+      server.close();
+      server.closeAllConnections();
     },
   };
 }

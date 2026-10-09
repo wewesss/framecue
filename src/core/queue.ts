@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { captureItemImages } from "./frames";
@@ -31,7 +32,7 @@ export function onQueueWritten(listener: (root: string, hash: string) => void): 
 }
 
 export function hashText(text: string): string {
-  return new Bun.CryptoHasher("sha256").update(text).digest("hex");
+  return createHash("sha256").update(text).digest("hex");
 }
 
 const TRANSIENT = new Set(["EPERM", "EBUSY", "EACCES"]);
