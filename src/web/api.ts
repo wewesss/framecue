@@ -55,6 +55,28 @@ export const api = {
     request<Item[]>("/api/items/reorder", { method: "POST", body: JSON.stringify({ ids }) }),
 };
 
+export type ExportFormat = "md" | "jsonl";
+
+export async function exportText(
+  format: ExportFormat,
+  ids?: string[],
+): Promise<{ text: string; count: number }> {
+  const query = new URLSearchParams({ format });
+  if (ids) query.set("ids", ids.join(","));
+  const res = await fetch(`/api/export?${query}`);
+  if (!res.ok) {
+    let message = `${res.status} ${res.statusText}`;
+    try {
+      const body = (await res.json()) as { error?: string };
+      if (body.error) message = body.error;
+    } catch {
+      message = `${res.status} ${res.statusText}`;
+    }
+    throw new Error(message);
+  }
+  return { text: await res.text(), count: Number(res.headers.get("X-Framecue-Count") ?? 0) };
+}
+
 export const streamUrl = "/api/video/stream";
 
 export function videoSrc(sha256: string): string {

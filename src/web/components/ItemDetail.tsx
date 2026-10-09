@@ -1,7 +1,7 @@
 import classigo from "classigo";
 import { useEffect, useRef, useState } from "react";
 import type { Item, ItemStatus } from "../../core/types";
-import { frameImageUrl, type ItemChanges } from "../api";
+import { type ExportFormat, frameImageUrl, type ItemChanges } from "../api";
 import { ageSince, captureTiles } from "../format";
 import { itemTimecode } from "../frame";
 import { Rich, useI18n } from "../i18n";
@@ -36,6 +36,7 @@ interface ItemDetailProps {
   onVerify: (id: string) => void;
   onReopen: (id: string) => void;
   onRecapture: (id: string) => Promise<boolean>;
+  onCopy: (format: ExportFormat, ids: string[]) => void;
   onTyping: () => void;
   onLeaveComment: () => void;
 }
@@ -73,6 +74,7 @@ function ItemForm({
   onVerify,
   onReopen,
   onRecapture,
+  onCopy,
   onTyping,
   onLeaveComment,
 }: FormProps) {
@@ -182,6 +184,20 @@ function ItemForm({
       onSelect: () => {
         void navigator.clipboard?.writeText(startTc).catch(() => undefined);
       },
+    },
+    {
+      type: "item",
+      id: "copy-md",
+      label: t("detail.copyAgentMd"),
+      icon: "robot",
+      onSelect: () => onCopy("md", [item.id]),
+    },
+    {
+      type: "item",
+      id: "copy-jsonl",
+      label: t("detail.copyAgentJsonl"),
+      icon: "robot",
+      onSelect: () => onCopy("jsonl", [item.id]),
     },
     {
       type: "item",

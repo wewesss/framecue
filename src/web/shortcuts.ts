@@ -19,7 +19,8 @@ export type Action =
   | "fit"
   | "snap"
   | "verify"
-  | "reopen";
+  | "reopen"
+  | "copy";
 
 export interface KeyInput {
   key: string;
@@ -31,6 +32,7 @@ export interface KeyInput {
 const resolve = matcher<KeyInput, Action | null>()
   .with({ mod: true }, () => null)
   .with({ alt: true }, () => null)
+  .with({ key: "C", shift: true }, () => "copy")
   .with({ key: " " }, () => "toggle")
   .with({ key: "ArrowLeft", shift: true }, () => "back10")
   .with({ key: "ArrowRight", shift: true }, () => "forward10")

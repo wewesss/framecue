@@ -1,5 +1,7 @@
+export * from "./export";
 export * from "./frames";
 export * from "./hash";
+export * from "./lock";
 export * from "./peaks";
 export * from "./probe";
 export * from "./queue";

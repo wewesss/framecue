@@ -1,6 +1,7 @@
 import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { captureItemImages } from "./frames";
+import { withFileLock } from "./lock";
 import { afterDirName, captureAfter } from "./render";
 import { frameToTimecode } from "./timecode";
 import type { Item, ItemKind, ItemStatus, Region, VideoInfo } from "./types";
@@ -22,10 +23,36 @@ export function canTransition(from: ItemStatus, to: ItemStatus): boolean {
 
 const locks = new Map<string, Promise<unknown>>();
 
+const writeListeners = new Set<(root: string, hash: string) => void>();
+
+export function onQueueWritten(listener: (root: string, hash: string) => void): () => void {
+  writeListeners.add(listener);
+  return () => writeListeners.delete(listener);
+}
+
+export function hashText(text: string): string {
+  return new Bun.CryptoHasher("sha256").update(text).digest("hex");
+}
+
+const TRANSIENT = new Set(["EPERM", "EBUSY", "EACCES"]);
+
+async function retryTransient<T>(fn: () => Promise<T>): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (attempt >= 8 || !code || !TRANSIENT.has(code)) throw error;
+      await new Promise((done) => setTimeout(done, 10 * (attempt + 1)));
+    }
+  }
+}
+
 function withLock<T>(root: string, fn: () => Promise<T>): Promise<T> {
   const key = resolve(root);
   const prev = locks.get(key) ?? Promise.resolve();
-  const next = prev.then(fn, fn);
+  const guarded = () => withFileLock(root, fn);
+  const next = prev.then(guarded, guarded);
   locks.set(
     key,
     next.catch(() => undefined),
@@ -42,7 +69,7 @@ export async function resolveWorkspace(videoPath: string, dir?: string): Promise
 export async function readQueue(root: string): Promise<Item[]> {
   let text: string;
   try {
-    text = await readFile(join(root, QUEUE_FILE), "utf8");
+    text = await retryTransient(() => readFile(join(root, QUEUE_FILE), "utf8"));
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
     throw error;
@@ -65,8 +92,11 @@ export async function writeQueue(root: string, items: Item[]): Promise<void> {
   const file = join(root, QUEUE_FILE);
   const tmp = `${file}.tmp`;
   await mkdir(root, { recursive: true });
-  await writeFile(tmp, items.map((it) => `${JSON.stringify(it)}\n`).join(""));
-  await rename(tmp, file);
+  const text = items.map((it) => `${JSON.stringify(it)}\n`).join("");
+  await writeFile(tmp, text);
+  await retryTransient(() => rename(tmp, file));
+  const hash = hashText(text);
+  for (const listener of [...writeListeners]) listener(resolve(root), hash);
 }
 
 export function newId(): string {

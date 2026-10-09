@@ -1,3 +1,5 @@
+import { type FSWatcher, watch as fsWatch } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { extname, join, normalize, resolve } from "node:path";
 import { matcher, P } from "matchigo";
 import {
@@ -6,18 +8,24 @@ import {
   computePeaks,
   createFsRenderSource,
   createItem,
+  defaultExportSet,
   deleteItem,
+  type ExportFormat,
+  exportItems,
   FrameOutOfRangeError,
+  hashText,
   type Item,
   type ItemKind,
   type ItemPatch,
   type ItemStatus,
+  onQueueWritten,
   type Peaks,
   probeVideo,
   type Region,
   type RenderEvent,
   type RenderSkip,
   type RenderSource,
+  rankMap,
   readQueue,
   reorder,
   resolveWorkspace,
@@ -34,6 +42,7 @@ const PORT_ATTEMPTS = 10;
 const VITE_PORT = 5173;
 
 const KEEP_ALIVE_MS = 20_000;
+const QUEUE_DEBOUNCE_MS = 150;
 
 const KINDS: ItemKind[] = ["frame", "range", "region"];
 const STATUSES: ItemStatus[] = ["todo", "fixed", "verified", "reopened"];
@@ -61,6 +70,7 @@ export interface StartServerOptions {
   port?: number;
   dev?: boolean;
   watch?: boolean;
+  watchQueue?: boolean;
   renderSource?: RenderSource;
   keepAliveMs?: number;
   onRender?: (event: RenderEvent) => void;
@@ -235,6 +245,38 @@ async function listItems({ url, workspace }: Ctx): Promise<Response> {
   return json(status ? items.filter((it) => it.status === status) : items);
 }
 
+async function exportQueue({ url, workspace, info }: Ctx): Promise<Response> {
+  const format = url.searchParams.get("format") ?? "md";
+  if (format !== "md" && format !== "jsonl") fail(400, `Invalid format: ${format}`);
+  const all = await readQueue(workspace);
+  const idsParam = url.searchParams.get("ids");
+  let chosen: Item[];
+  if (idsParam === null) {
+    chosen = defaultExportSet(all);
+  } else {
+    const ids = idsParam.split(",").filter((id) => id !== "");
+    const byId = new Map(all.map((it) => [it.id, it]));
+    chosen = ids.map((id) => {
+      const found = byId.get(id);
+      if (!found) fail(404, `Item not found: ${id}`);
+      return found;
+    });
+  }
+  const body = exportItems(
+    chosen,
+    { video: info, workspace, ranks: rankMap(all) },
+    format as ExportFormat,
+  );
+  return new Response(body, {
+    headers: {
+      "Content-Type":
+        format === "md" ? "text/plain; charset=utf-8" : "application/x-ndjson; charset=utf-8",
+      "Cache-Control": "no-store",
+      "X-Framecue-Count": String(chosen.length),
+    },
+  });
+}
+
 async function postItem({ request, info, sha256, workspace }: Ctx): Promise<Response> {
   const body = await readBody(request);
   if (typeof body.kind !== "string" || !KINDS.includes(body.kind as ItemKind)) {
@@ -308,6 +350,7 @@ const dispatch = matcher<Ctx, Response | Promise<Response>>()
   .with({ method: "GET", parts: P.tuple("api", "video", "stream") }, streamVideo)
   .with({ method: "GET", parts: P.tuple("api", "audio", "peaks") }, serveAudioPeaks)
   .with({ method: "GET", parts: P.tuple("api", "items") }, listItems)
+  .with({ method: "GET", parts: P.tuple("api", "export") }, exportQueue)
   .with({ method: "POST", parts: P.tuple("api", "items") }, postItem)
   .with({ method: "POST", parts: P.tuple("api", "items", "reorder") }, reorderItems)
   .with({ method: "PATCH", parts: P.tuple("api", "items", P.string) }, patchItem)
@@ -387,6 +430,7 @@ export async function startServer({
   port = DEFAULT_PORT,
   dev = false,
   watch = true,
+  watchQueue = true,
   renderSource,
   keepAliveMs = KEEP_ALIVE_MS,
   onRender,
@@ -505,6 +549,31 @@ export async function startServer({
     renders = renders.then(processRender).catch((error) => onRenderError?.(error));
   });
 
+  let queueWatcher: FSWatcher | null = null;
+  let queueTimer: ReturnType<typeof setTimeout> | undefined;
+  let queueUnhook: (() => void) | null = null;
+  if (watchQueue) {
+    const queuePath = join(workspace, "queue.jsonl");
+    let known = await readFile(queuePath, "utf8").then(hashText, () => "");
+    queueUnhook = onQueueWritten((root, hash) => {
+      if (root === workspace) known = hash;
+    });
+    const check = async () => {
+      const hash = await readFile(queuePath, "utf8").then(hashText, () => "");
+      if (hash === known) return;
+      known = hash;
+      broadcast("items", { ids: [] });
+    };
+    try {
+      queueWatcher = fsWatch(workspace, (_event, filename) => {
+        if (filename && filename.toString() !== "queue.jsonl") return;
+        clearTimeout(queueTimer);
+        queueTimer = setTimeout(() => void check().catch(() => undefined), QUEUE_DEBOUNCE_MS);
+      });
+      queueWatcher.on("error", () => undefined);
+    } catch {}
+  }
+
   let boundPort = 0;
 
   const hostAllowed = (host: string | null) =>
@@ -527,7 +596,11 @@ export async function startServer({
     const url = new URL(request.url);
     const parts = decodeParts(url.pathname);
     if (!parts) return json({ error: "Invalid path" }, 400);
-    if (parts[0] === "api" && parts[1] === "events" && !originAllowed(origin)) {
+    if (
+      parts[0] === "api" &&
+      (parts[1] === "events" || parts[1] === "export") &&
+      !originAllowed(origin)
+    ) {
       return json({ error: "Forbidden origin" }, 403);
     }
     const ctx: Ctx = {
@@ -559,6 +632,9 @@ export async function startServer({
     workspace,
     stop: () => {
       unsubscribe?.();
+      clearTimeout(queueTimer);
+      queueWatcher?.close();
+      queueUnhook?.();
       if (!renderSource) source?.close();
       for (const close of [...openStreams]) close();
       server.stop(true);

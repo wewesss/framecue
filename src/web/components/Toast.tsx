@@ -8,6 +8,7 @@ export interface ToastData {
   verify: number;
   skipped: number;
   timing: { from: string; to: string } | null;
+  notice: string | null;
 }
 
 interface ToastProps {
@@ -17,6 +18,7 @@ interface ToastProps {
 }
 
 const AUTO_DISMISS_MS = 12_000;
+const NOTICE_DISMISS_MS = 5000;
 
 export function Toast({ data, onSee, onDismiss }: ToastProps) {
   const t = useT();
@@ -26,9 +28,22 @@ export function Toast({ data, onSee, onDismiss }: ToastProps) {
 
   useEffect(() => {
     if (sticky) return;
-    const handle = window.setTimeout(() => dismiss.current(), AUTO_DISMISS_MS);
+    const delay = data.notice !== null ? NOTICE_DISMISS_MS : AUTO_DISMISS_MS;
+    const handle = window.setTimeout(() => dismiss.current(), delay);
     return () => window.clearTimeout(handle);
-  }, [sticky]);
+  }, [sticky, data.notice]);
+
+  if (data.notice !== null) {
+    return (
+      <div className="toast" role="status">
+        <Icon name="checkmark.circle" size={16} className="toast__icon" />
+        <div className="toast__text">
+          <span>{data.notice}</span>
+        </div>
+        <IconButton icon="xmark" size="sm" label={t("toast.dismiss")} onClick={onDismiss} />
+      </div>
+    );
+  }
 
   return (
     <div className="toast" role={sticky ? "alert" : "status"}>

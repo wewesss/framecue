@@ -4,6 +4,7 @@
   flex-direction: column;
   position: relative;
   min-height: 210px;
+  container-type: inline-size;
 
   &__head {
     display: flex;
@@ -62,6 +63,28 @@
     border-top: 1px solid var(--border-subtle);
     color: var(--text-muted);
     font-size: var(--fs-sm);
+  }
+
+  &__summary {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__foot .btn {
+    flex: none;
+  }
+}
+
+@container (max-width: 379px) {
+  .queue__copy-label {
+    display: none;
+  }
+
+  .queue__foot .btn {
+    padding: 0 10px;
   }
 }
 

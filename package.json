@@ -26,11 +26,13 @@
   },
   "dependencies": {
     "@miralabs-tech/icones": "^0.3.0",
+    "@modelcontextprotocol/sdk": "^1.32.1",
     "@standarx/nav": "^0.3.0",
     "classigo": "^2.0.0",
     "matchigo": "^1.0.3",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.15",

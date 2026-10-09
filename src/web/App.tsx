@@ -11,7 +11,16 @@ import {
   useState,
 } from "react";
 import type { Item, ItemKind, Region, RenderEvent } from "../core/types";
-import { api, type ItemChanges, subscribeEvents, type VideoResponse } from "./api";
+import { agentFixedItems } from "./agent";
+import {
+  api,
+  type ExportFormat,
+  exportText,
+  type ItemChanges,
+  subscribeEvents,
+  type VideoResponse,
+} from "./api";
+import { copyText } from "./clipboard";
 import { HelpSheet } from "./components/HelpSheet";
 import { ItemDetail } from "./components/ItemDetail";
 import { type Filter, QueuePanel } from "./components/QueuePanel";
@@ -101,6 +110,22 @@ export function App() {
       .catch(report);
   }, [report]);
 
+  const itemsRef = useRef<Item[]>(items);
+  itemsRef.current = items;
+
+  const onAgentFixed = useRef((_fixed: Item[], _all: Item[]) => {});
+  onAgentFixed.current = (fixed, all) => {
+    const rankOf = new Map(
+      [...all].sort((a, b) => a.priority - b.priority).map((it, i) => [it.id, i + 1]),
+    );
+    const first = fixed[0] as Item;
+    const notice =
+      fixed.length === 1
+        ? t("toast.agentFixed", { n: rankOf.get(first.id) ?? 0 })
+        : t("toast.agentFixedMany", { n: fixed.length });
+    setToast({ id: Date.now(), verify: 0, skipped: 0, timing: null, notice });
+  };
+
   const onRender = useRef((_event: RenderEvent) => {});
   onRender.current = (event) => {
     if (videoRef.current) resumeFrame.current = frameLatest.current;
@@ -119,6 +144,7 @@ export function App() {
       verify: event.capturedIds.length,
       skipped: event.skipped.length,
       timing: timing ? { from: describe(timing.from), to: describe(timing.to) } : null,
+      notice: null,
     });
   };
 
@@ -127,7 +153,14 @@ export function App() {
       subscribeEvents({
         render: (event) => onRender.current(event),
         items: () => {
-          api.items().then(setItems).catch(report);
+          api
+            .items()
+            .then((list) => {
+              const fixed = agentFixedItems(itemsRef.current, list);
+              setItems(list);
+              if (fixed.length > 0) onAgentFixed.current(fixed, list);
+            })
+            .catch(report);
         },
       }),
     [report],
@@ -211,6 +244,7 @@ export function App() {
       selectedItem && needsVerification(selectedItem) && void verdict(selectedItem.id, "verified"),
     reopen: () =>
       selectedItem && needsVerification(selectedItem) && void verdict(selectedItem.id, "reopened"),
+    copy: () => void copyForAgent("md"),
   };
   const handlersRef = useRef(handlers);
   handlersRef.current = handlers;
@@ -261,6 +295,23 @@ export function App() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  const copyForAgent = async (format: ExportFormat, ids?: string[]) => {
+    try {
+      const { text, count } = await exportText(format, ids);
+      if (count === 0) return;
+      await copyText(text);
+      setToast({
+        id: Date.now(),
+        verify: 0,
+        skipped: 0,
+        timing: null,
+        notice: t("copy.done", { n: count, format: format === "md" ? "Markdown" : "JSONL" }),
+      });
+    } catch (e) {
+      report(new Error(t("copy.failed", { error: e instanceof Error ? e.message : String(e) })));
+    }
+  };
 
   const select = (item: Item) => {
     setBatchDone(false);
@@ -496,6 +547,7 @@ export function App() {
             onFilter={setFilter}
             onSelect={select}
             onReorder={reorder}
+            onCopy={(format, ids) => void copyForAgent(format, ids)}
           />
           <ItemDetail
             item={selectedItem}
@@ -511,6 +563,7 @@ export function App() {
             onVerify={(id) => void verdict(id, "verified")}
             onReopen={(id) => void verdict(id, "reopened")}
             onRecapture={recapture}
+            onCopy={(format, ids) => void copyForAgent(format, ids)}
             onTyping={player.pause}
             onLeaveComment={focusStage}
           />

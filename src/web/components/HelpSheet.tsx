@@ -257,6 +257,7 @@ export function HelpSheet({ open, onClose }: HelpSheetProps) {
               />
               <Row lead={<Combos of={[[alt, "↑"], ["↓"]]} />} desc={t("help.reorder")} />
               <Row lead={<Combos of={[[t("key.delete")]]} />} desc={t("help.deleteItem")} />
+              <Row lead={<Combos of={[[shift, "C"]]} />} desc={t("help.copyAgent")} />
               <Row
                 lead={
                   <>
