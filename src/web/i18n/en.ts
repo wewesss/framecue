@@ -101,7 +101,7 @@ export const en: Record<TKey, string> = {
   "detail.before": "Before",
   "detail.after": "After",
   "detail.beforeTip": "Captured render",
-  "detail.afterTip": "After a new render (step 5)",
+  "detail.afterTip": "Frames from the latest render",
   "detail.added": "Added {ago}",
   "detail.justNow": "just now",
   "detail.confirm": "Delete item #{n}?",
@@ -268,4 +268,46 @@ export const en: Record<TKey, string> = {
   "help.agent.mcp": "MCP",
   "help.agent.mcpBody":
     "<c>framecue mcp</c> (stdio): <c>list_items</c>, <c>next_item</c>, <c>get_item</c>, <c>mark_fixed</c>. The agent can only mark Fixed; only you verify.",
+  "toast.render": "New render detected",
+  "toast.toVerifyOne": "1 item to verify",
+  "toast.toVerifyMany": "{n} items to verify",
+  "toast.skippedOne": "1 item outside the new render",
+  "toast.skippedMany": "{n} items outside the new render",
+  "toast.timing":
+    "Frame rate or frame count changed ({from} → {to}): frame numbers may no longer line up.",
+  "toast.see": "Show",
+  "toast.dismiss": "Dismiss",
+
+  "detail.afterNoneTip": "No after-render images: recapture them or wait for a new render",
+  "detail.afterMeta": "Render {sha} · {time}",
+  "detail.compareOpen": "Compare",
+  "detail.compareTip": "Before and after of the selected capture",
+  "detail.recapture": "Recapture after",
+  "detail.recaptureTip": "Extract these frames from the current render",
+  "detail.recapturing": "Capturing…",
+
+  "verify.label": "Verification",
+  "verify.verified": "Verified",
+  "verify.reopen": "Reopen",
+  "verify.verifiedTip": "The fix is right",
+  "verify.reopenTip": "Still wrong: goes back to the agent",
+  "verify.done": "All verified",
+  "verify.doneBody": "No fixed item is waiting for verification any more.",
+
+  "queue.afterDot": "After ready",
+  "queue.afterDotTip": "After-render images available: ready to verify",
+
+  "compare.title": "Before / After · {label}",
+  "compare.mode": "Comparison mode",
+  "compare.side": "Side by side",
+  "compare.wipe": "Wipe",
+  "compare.slider": "Wipe position",
+
+  "help.group.verify": "Verification",
+  "help.verify": "Mark the item Verified",
+  "help.reopen": "Reopen the item",
+  "help.verifyNote":
+    "when it is Fixed and its after-render images are there; moves to the next one",
+  "help.compareKeys": "Move the wipe in the comparison",
+  "help.compareKeysNote": "with Shift: steps of 10 %; Esc closes",
 };

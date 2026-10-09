@@ -10,16 +10,18 @@ import {
   useRef,
   useState,
 } from "react";
-import type { Item, ItemKind, Region } from "../core/types";
-import { api, type ItemChanges, type VideoResponse } from "./api";
+import type { Item, ItemKind, Region, RenderEvent } from "../core/types";
+import { api, type ItemChanges, subscribeEvents, type VideoResponse } from "./api";
 import { HelpSheet } from "./components/HelpSheet";
 import { ItemDetail } from "./components/ItemDetail";
 import { type Filter, QueuePanel } from "./components/QueuePanel";
 import { Stage } from "./components/Stage";
 import { Timeline } from "./components/Timeline";
+import { Toast, type ToastData } from "./components/Toast";
 import { ToolsRow } from "./components/ToolsRow";
 import { TopBar } from "./components/TopBar";
 import { Transport } from "./components/Transport";
+import { fpsValue } from "./format";
 import { useT } from "./i18n";
 import { NavBridge } from "./NavBridge";
 import { NATIVE } from "./nav";
@@ -33,6 +35,7 @@ import { emptySelection, type Selection } from "./types";
 import { Button } from "./ui/Button";
 import { Tooltip, TooltipHost } from "./ui/Tooltip";
 import { useVideoFrame } from "./useVideoFrame";
+import { needsVerification, nextToVerify } from "./verify";
 
 const PANEL_MIN = 320;
 const PANEL_MAX = 400;
@@ -75,9 +78,14 @@ export function App() {
   const [snap, setSnap] = useState(false);
   const [longPress, setLongPress] = useState(true);
   const [wave, setWave] = useState(true);
+  const [toast, setToast] = useState<ToastData | null>(null);
+  const [batchDone, setBatchDone] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const player = useVideoFrame(videoRef, info?.fps, info?.frameCount);
   const { frame, seekFrame } = player;
+  const frameLatest = useRef(0);
+  frameLatest.current = frame;
+  const resumeFrame = useRef<number | null>(null);
   const tl = useTimelineView(info?.frameCount ?? 0);
 
   const report = useCallback((e: unknown) => {
@@ -92,6 +100,46 @@ export function App() {
       .then(setItems)
       .catch(report);
   }, [report]);
+
+  const onRender = useRef((_event: RenderEvent) => {});
+  onRender.current = (event) => {
+    if (videoRef.current) resumeFrame.current = frameLatest.current;
+    Promise.all([api.video(), api.items()])
+      .then(([video, list]) => {
+        setInfo(video);
+        setItems(list);
+      })
+      .catch(report);
+    const timing = event.timingChanged;
+    const describe = (s: { fps: number; frameCount: number }) =>
+      `${t("unit.fps", { n: fpsValue(s.fps) })} · ${t("unit.frames", { n: s.frameCount })}`;
+    setBatchDone(false);
+    setToast({
+      id: Date.now(),
+      verify: event.capturedIds.length,
+      skipped: event.skipped.length,
+      timing: timing ? { from: describe(timing.from), to: describe(timing.to) } : null,
+    });
+  };
+
+  useEffect(
+    () =>
+      subscribeEvents({
+        render: (event) => onRender.current(event),
+        items: () => {
+          api.items().then(setItems).catch(report);
+        },
+      }),
+    [report],
+  );
+
+  useEffect(() => {
+    const target = resumeFrame.current;
+    const video = videoRef.current;
+    if (target === null || !video || !info) return;
+    resumeFrame.current = null;
+    video.addEventListener("loadedmetadata", () => seekFrame(target), { once: true });
+  }, [info, seekFrame]);
 
   const sorted = useMemo(() => [...items].sort((a, b) => a.priority - b.priority), [items]);
   const selectedItem = useMemo(
@@ -159,6 +207,10 @@ export function App() {
     zoomOut: () => tl.zoomBy(1 / ZOOM_STEP, frame + 0.5),
     fit: tl.fit,
     snap: () => setSnap((on) => !on),
+    verify: () =>
+      selectedItem && needsVerification(selectedItem) && void verdict(selectedItem.id, "verified"),
+    reopen: () =>
+      selectedItem && needsVerification(selectedItem) && void verdict(selectedItem.id, "reopened"),
   };
   const handlersRef = useRef(handlers);
   handlersRef.current = handlers;
@@ -196,6 +248,13 @@ export function App() {
       });
       if (!action) return;
       if (helpOpenRef.current && action !== "clear" && action !== "help") return;
+      if (
+        (action === "verify" || action === "reopen") &&
+        event.target instanceof HTMLElement &&
+        event.target.closest('[role="dialog"], [role="alertdialog"]')
+      ) {
+        return;
+      }
       event.preventDefault();
       handlersRef.current[action]();
     };
@@ -204,6 +263,7 @@ export function App() {
   }, []);
 
   const select = (item: Item) => {
+    setBatchDone(false);
     setSelectedId(item.id);
     setFocusId(null);
     setConfirmingId(null);
@@ -219,6 +279,34 @@ export function App() {
   const change = (id: string, changes: ItemChanges): Promise<boolean> =>
     api
       .update(id, changes)
+      .then((updated) => {
+        setItems((list) => list.map((it) => (it.id === id ? updated : it)));
+        return true;
+      })
+      .catch((e) => {
+        report(e);
+        return false;
+      });
+
+  const verdict = async (id: string, status: "verified" | "reopened") => {
+    if (!(await change(id, { status }))) return;
+    const updated = sorted.map((it) => (it.id === id ? { ...it, status } : it));
+    const next = nextToVerify(updated, id);
+    if (!next) {
+      setBatchDone(true);
+      return;
+    }
+    select(next);
+    requestAnimationFrame(() => {
+      document
+        .querySelector<HTMLElement>(`[data-row-id="${CSS.escape(next.id)}"]`)
+        ?.scrollIntoView({ block: "nearest" });
+    });
+  };
+
+  const recapture = (id: string): Promise<boolean> =>
+    api
+      .recaptureAfter(id)
       .then((updated) => {
         setItems((list) => list.map((it) => (it.id === id ? updated : it)));
         return true;
@@ -310,6 +398,17 @@ export function App() {
               <Button onClick={() => setError(null)}>{t("app.dismiss")}</Button>
             </div>
           )}
+          {toast && (
+            <Toast
+              key={toast.id}
+              data={toast}
+              onSee={() => {
+                setFilter("fixed");
+                setToast(null);
+              }}
+              onDismiss={() => setToast(null)}
+            />
+          )}
           {info ? (
             <>
               <Stage
@@ -392,7 +491,6 @@ export function App() {
           </Tooltip>
           <QueuePanel
             items={items}
-            fps={info?.fps ?? 25}
             selectedId={selectedId}
             filter={filter}
             onFilter={setFilter}
@@ -403,12 +501,16 @@ export function App() {
             item={selectedItem}
             number={selectedNumber}
             autoFocus={selectedItem?.id === focusId}
+            batchDone={batchDone}
             confirming={selectedItem !== null && confirmingId === selectedItem.id}
             onRequestDelete={() => selectedItem && setConfirmingId(selectedItem.id)}
             onCancelDelete={() => setConfirmingId(null)}
             onChange={change}
             onDelete={remove}
             onSeek={seekTo}
+            onVerify={(id) => void verdict(id, "verified")}
+            onReopen={(id) => void verdict(id, "reopened")}
+            onRecapture={recapture}
             onTyping={player.pause}
             onLeaveComment={focusStage}
           />

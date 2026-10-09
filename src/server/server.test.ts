@@ -3,8 +3,8 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { connect } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { type Fixtures, makeFixtures } from "../core/fixtures";
-import type { Item } from "../core/types";
+import { type Fixtures, makeFixtures, renderByRename, renderClip } from "../core/fixtures";
+import type { Item, RenderEvent } from "../core/types";
 import { type RunningServer, startServer } from "./server";
 
 let fx: Fixtures;
@@ -243,4 +243,187 @@ test("unknown api route is 404 JSON", async () => {
   const res = await send("GET", "/api/nope");
   expect(res.status).toBe(404);
   expect(((await res.json()) as { error: string }).error).toBeString();
+});
+
+interface SseReader {
+  next(name: string, timeoutMs: number): Promise<unknown>;
+  close(): void;
+}
+
+async function openEvents(url: string): Promise<{ res: Response; reader: SseReader }> {
+  const controller = new AbortController();
+  const res = await fetch(`${url}/api/events`, { signal: controller.signal });
+  const body = (res.body as ReadableStream<Uint8Array>).getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  const reader: SseReader = {
+    async next(name, timeoutMs) {
+      const end = Date.now() + timeoutMs;
+      for (;;) {
+        let cut = buffer.indexOf("\n\n");
+        while (cut >= 0) {
+          const block = buffer.slice(0, cut);
+          buffer = buffer.slice(cut + 2);
+          const event = /^event: (.+)$/m.exec(block)?.[1];
+          const data = /^data: (.+)$/m.exec(block)?.[1];
+          if (event === name && data) return JSON.parse(data);
+          cut = buffer.indexOf("\n\n");
+        }
+        const left = end - Date.now();
+        if (left <= 0) throw new Error(`No ${name} event within ${timeoutMs} ms`);
+        const chunk = await Promise.race([
+          body.read(),
+          new Promise<null>((r) => setTimeout(() => r(null), left)),
+        ]);
+        if (chunk === null) throw new Error(`No ${name} event within ${timeoutMs} ms`);
+        if (chunk.done) throw new Error("Event stream ended");
+        buffer += decoder.decode(chunk.value, { stream: true });
+      }
+    },
+    close() {
+      controller.abort();
+    },
+  };
+  return { res, reader };
+}
+
+describe("re-render loop", () => {
+  let dir: string;
+  let clip: string;
+  let live: RunningServer;
+  let api: string;
+  let fixedA: Item;
+  let fixedLate: Item;
+  let todo: Item;
+
+  const call = (method: string, path: string, body?: unknown) =>
+    fetch(`${api}${path}`, {
+      method,
+      headers: body === undefined ? {} : { "Content-Type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+
+  beforeAll(async () => {
+    dir = await mkdtemp(join(tmpdir(), "framecue-rr-"));
+    clip = join(dir, "clip.mp4");
+    await renderClip(clip);
+    live = await startServer({ videoPath: clip, workspaceDir: join(dir, "ws"), port: 0 });
+    api = live.url;
+    const make = async (frameStart: number) =>
+      (await (
+        await call("POST", "/api/items", { kind: "frame", frameStart, comment: "" })
+      ).json()) as Item;
+    fixedA = await make(5);
+    fixedLate = await make(40);
+    todo = await make(8);
+    for (const it of [fixedA, fixedLate])
+      await call("PATCH", `/api/items/${it.id}`, { status: "fixed" });
+  }, 30_000);
+
+  afterAll(async () => {
+    live.stop();
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  test("event stream headers", async () => {
+    const { res, reader } = await openEvents(api);
+    expect(res.headers.get("content-type")).toStartWith("text/event-stream");
+    reader.close();
+  });
+
+  test("events reject a foreign Host", async () => {
+    const res = await fetch(`${api}/api/events`, { headers: { Origin: "http://evil.example" } });
+    expect(res.status).toBe(403);
+  });
+
+  test("a render captures after images for fixed items only", async () => {
+    const { reader } = await openEvents(api);
+    try {
+      await renderByRename(clip, { box: [4, 10], seconds: 1 });
+      const event = (await reader.next("render", 20_000)) as RenderEvent;
+      expect(event.sha256).toMatch(/^[0-9a-f]{64}$/);
+      expect(event.info.frameCount).toBe(25);
+      expect(event.capturedIds).toEqual([fixedA.id]);
+      expect(event.skipped.map((s) => s.id)).toEqual([fixedLate.id]);
+      expect(event.skipped[0]?.reason).toBeString();
+      expect(event.timingChanged).toEqual({
+        from: { fps: 25, frameCount: 50 },
+        to: { fps: 25, frameCount: 25 },
+      });
+      await reader.next("items", 5000);
+
+      const items = (await (await call("GET", "/api/items")).json()) as Item[];
+      const byId = new Map(items.map((i) => [i.id, i]));
+      expect(byId.get(fixedA.id)?.after?.sha256).toBe(event.sha256);
+      expect(byId.get(fixedA.id)?.after?.images[0]).toBe(
+        `frames/${fixedA.id}/after-${event.sha256.slice(0, 8)}/frame.png`,
+      );
+      expect(byId.get(fixedLate.id)?.after ?? null).toBeNull();
+      expect(byId.get(todo.id)?.after ?? null).toBeNull();
+
+      const info = (await (await call("GET", "/api/video")).json()) as {
+        sha256: string;
+        frameCount: number;
+      };
+      expect(info.sha256).toBe(event.sha256);
+      expect(info.frameCount).toBe(25);
+
+      const image = await call(
+        "GET",
+        `/api/frames/${fixedA.id}/after-${event.sha256.slice(0, 8)}/frame.png`,
+      );
+      expect(image.status).toBe(200);
+      expect(image.headers.get("content-type")).toBe("image/png");
+
+      const stream = await call("GET", `/api/video/stream?v=${event.sha256.slice(0, 8)}`);
+      expect(stream.status).toBe(200);
+      expect((await stream.arrayBuffer()).byteLength).toBe(Bun.file(clip).size);
+    } finally {
+      reader.close();
+    }
+  }, 40_000);
+
+  test("POST /after captures on demand for any status", async () => {
+    const res = await call("POST", `/api/items/${todo.id}/after`);
+    expect(res.status).toBe(200);
+    const item = (await res.json()) as Item;
+    expect(item.status).toBe("todo");
+    expect(item.after?.images[0]).toMatch(
+      new RegExp(`^frames/${todo.id}/after-[0-9a-f]{8}/frame.png$`),
+    );
+  });
+
+  test("POST /after out of range is 409, unknown id is 404", async () => {
+    const late = await call("POST", `/api/items/${fixedLate.id}/after`);
+    expect(late.status).toBe(409);
+    expect(((await late.json()) as { error: string }).error).toBeString();
+    expect((await call("POST", "/api/items/nope/after")).status).toBe(404);
+  });
+  test("a render that no longer covers an item clears its stale after", async () => {
+    const created = (await (
+      await call("POST", "/api/items", { kind: "frame", frameStart: 20, comment: "" })
+    ).json()) as Item;
+    await call("PATCH", `/api/items/${created.id}`, { status: "fixed" });
+    const captured = (await (await call("POST", `/api/items/${created.id}/after`)).json()) as Item;
+    const folder = join(
+      dir,
+      "ws",
+      "frames",
+      created.id,
+      captured.after?.images[0]?.split("/")[2] ?? "x",
+    );
+    expect(await Bun.file(join(folder, "frame.png")).exists()).toBe(true);
+    const { reader } = await openEvents(api);
+    try {
+      await renderByRename(clip, { box: [2, 6], seconds: 0.4 });
+      const event = (await reader.next("render", 20_000)) as RenderEvent;
+      expect(event.skipped.map((s) => s.id)).toContain(created.id);
+      expect(event.capturedIds).not.toContain(created.id);
+      const items = (await (await call("GET", "/api/items")).json()) as Item[];
+      expect(items.find((i) => i.id === created.id)?.after ?? null).toBeNull();
+      expect(await Bun.file(join(folder, "frame.png")).exists()).toBe(false);
+    } finally {
+      reader.close();
+    }
+  }, 40_000);
 });

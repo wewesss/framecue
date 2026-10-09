@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Item, ItemStatus } from "../../core/types";
 import { frameImageUrl, type ItemChanges } from "../api";
 import { ageSince, captureTiles } from "../format";
-import { formatTimecode } from "../frame";
+import { itemTimecode } from "../frame";
 import { Rich, useI18n } from "../i18n";
 import {
   kindIcon,
@@ -16,6 +16,7 @@ import {
 import { Button, IconButton } from "../ui/Button";
 import { Field, Textarea } from "../ui/Field";
 import { Icon } from "../ui/Icon";
+import { Kbd } from "../ui/Kbd";
 import { Lightbox } from "../ui/Lightbox";
 import { Menu, type MenuEntry } from "../ui/Menu";
 import { SegmentedControl, type SegmentOption } from "../ui/SegmentedControl";
@@ -25,12 +26,16 @@ interface ItemDetailProps {
   item: Item | null;
   number: number;
   autoFocus: boolean;
+  batchDone: boolean;
   confirming: boolean;
   onRequestDelete: () => void;
   onCancelDelete: () => void;
   onChange: (id: string, changes: ItemChanges) => Promise<boolean>;
   onDelete: (id: string) => void;
   onSeek: (frame: number) => void;
+  onVerify: (id: string) => void;
+  onReopen: (id: string) => void;
+  onRecapture: (id: string) => Promise<boolean>;
   onTyping: () => void;
   onLeaveComment: () => void;
 }
@@ -58,12 +63,16 @@ function ItemForm({
   item,
   number,
   autoFocus,
+  batchDone,
   confirming,
   onRequestDelete,
   onCancelDelete,
   onChange,
   onDelete,
   onSeek,
+  onVerify,
+  onReopen,
+  onRecapture,
   onTyping,
   onLeaveComment,
 }: FormProps) {
@@ -74,11 +83,28 @@ function ItemForm({
   const flashTimer = useRef<number | undefined>(undefined);
   const [flash, setFlash] = useState(false);
   const [sheet, setSheet] = useState<string | null>(null);
+  const [view, setView] = useState<Compare>(item.after ? "after" : "before");
+  const [picked, setPicked] = useState<string | null>(null);
+  const [comparing, setComparing] = useState(false);
+  const [recapturing, setRecapturing] = useState(false);
+  const afterSha = item.after?.sha256;
 
   const isRange = item.frameEnd > item.frameStart;
   const frames = item.frameEnd - item.frameStart + 1;
-  const tiles = captureTiles(item);
-  const startTc = formatTimecode(item.frameStart, item.fps);
+  const shown: Compare = item.after ? view : "before";
+  const tiles = captureTiles(
+    shown === "after" && item.after ? { ...item, images: item.after.images } : item,
+  );
+  const baseName = (image: string) => image.split("/").pop() ?? image;
+  const pickedName =
+    picked !== null && tiles.some((tile) => baseName(tile.image) === picked)
+      ? picked
+      : baseName(tiles[0]?.image ?? "");
+  const pickedTile = tiles.find((tile) => baseName(tile.image) === pickedName);
+  const beforeImage = item.images.find((image) => baseName(image) === pickedName);
+  const afterImage = item.after?.images.find((image) => baseName(image) === pickedName);
+  const awaitingVerdict = item.status === "fixed" && item.after != null;
+  const startTc = itemTimecode(item, item.frameStart);
 
   useEffect(() => {
     if (autoFocus) areaRef.current?.focus();
@@ -99,6 +125,15 @@ function ItemForm({
   }, [confirming]);
 
   useEffect(() => () => window.clearTimeout(flashTimer.current), []);
+
+  useEffect(() => {
+    if (afterSha) setView("after");
+  }, [afterSha]);
+
+  const recapture = () => {
+    setRecapturing(true);
+    void onRecapture(item.id).finally(() => setRecapturing(false));
+  };
 
   const save = () => {
     const area = areaRef.current;
@@ -130,7 +165,12 @@ function ItemForm({
 
   const compareOptions: SegmentOption<Compare>[] = [
     { value: "before", content: t("detail.before"), tip: t("detail.beforeTip") },
-    { value: "after", content: t("detail.after"), tip: t("detail.afterTip"), disabled: true },
+    {
+      value: "after",
+      content: t("detail.after"),
+      tip: item.after ? t("detail.afterTip") : t("detail.afterNoneTip"),
+      disabled: !item.after,
+    },
   ];
 
   const menuEntries: MenuEntry[] = [
@@ -189,7 +229,7 @@ function ItemForm({
               item.frameStart
             )}
             <br />
-            {isRange ? `${startTc} → ${formatTimecode(item.frameEnd, item.fps)}` : startTc}
+            {isRange ? `${startTc} → ${itemTimecode(item, item.frameEnd)}` : startTc}
             {item.region && (
               <>
                 <span className="detail__sep">·</span>
@@ -222,6 +262,40 @@ function ItemForm({
         />
       </header>
       <div className="detail__body">
+        {awaitingVerdict && (
+          <fieldset className="verify" aria-label={t("verify.label")}>
+            <Tooltip tip={t("verify.verifiedTip")} keys={[["V"]]}>
+              <Button
+                variant="primary"
+                icon="checkmark.circle"
+                className="verify__btn"
+                onClick={() => onVerify(item.id)}
+              >
+                {t("verify.verified")}
+                <Kbd>V</Kbd>
+              </Button>
+            </Tooltip>
+            <Tooltip tip={t("verify.reopenTip")} keys={[["X"]]}>
+              <Button
+                icon="arrow.counterclockwise"
+                className="verify__btn"
+                onClick={() => onReopen(item.id)}
+              >
+                {t("verify.reopen")}
+                <Kbd>X</Kbd>
+              </Button>
+            </Tooltip>
+          </fieldset>
+        )}
+        {!awaitingVerdict && batchDone && (
+          <div className="verify verify--done" role="status">
+            <Icon name="checkmark.circle" size={16} />
+            <div>
+              <b>{t("verify.done")}</b>
+              <span>{t("verify.doneBody")}</span>
+            </div>
+          </div>
+        )}
         <Field label={t("status.label")}>
           <SegmentedControl<ItemStatus>
             label={t("status.label")}
@@ -283,9 +357,9 @@ function ItemForm({
               <SegmentedControl<Compare>
                 label={t("detail.compare")}
                 variant="mini"
-                value="before"
+                value={shown}
                 options={compareOptions}
-                onChange={() => undefined}
+                onChange={setView}
               />
             }
           >
@@ -301,8 +375,11 @@ function ItemForm({
                 >
                   <button
                     type="button"
-                    className="cap"
+                    className={classigo("cap", {
+                      "cap--on": item.after != null && baseName(tile.image) === pickedName,
+                    })}
                     onClick={() => {
+                      setPicked(baseName(tile.image));
                       if (tile.sheet) setSheet(tile.image);
                       else if (tile.frame !== null) onSeek(tile.frame);
                     }}
@@ -317,6 +394,38 @@ function ItemForm({
                   </button>
                 </Tooltip>
               ))}
+            </div>
+            <div className="caps__foot">
+              {shown === "after" && item.after ? (
+                <span className="caps__meta">
+                  {t("detail.afterMeta", {
+                    sha: item.after.sha256.slice(0, 8),
+                    time: new Date(item.after.capturedAt).toLocaleTimeString(lang, {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    }),
+                  })}
+                </span>
+              ) : (
+                <span />
+              )}
+              {item.after ? (
+                <Tooltip tip={t("detail.compareTip")}>
+                  <Button
+                    variant="plain"
+                    icon="arrow.up.left.and.arrow.down.right"
+                    onClick={() => setComparing(true)}
+                  >
+                    {t("detail.compareOpen")}
+                  </Button>
+                </Tooltip>
+              ) : (
+                <Tooltip tip={t("detail.recaptureTip")}>
+                  <Button variant="plain" icon="photo" disabled={recapturing} onClick={recapture}>
+                    {recapturing ? t("detail.recapturing") : t("detail.recapture")}
+                  </Button>
+                </Tooltip>
+              )}
             </div>
           </Field>
         )}
@@ -345,6 +454,26 @@ function ItemForm({
           </div>
         )}
       </div>
+      {comparing && beforeImage && afterImage && pickedTile && (
+        <Lightbox
+          compare={{
+            before: frameImageUrl(beforeImage),
+            after: frameImageUrl(afterImage),
+            labels: {
+              before: t("detail.before"),
+              after: t("detail.after"),
+              mode: t("compare.mode"),
+              side: t("compare.side"),
+              wipe: t("compare.wipe"),
+              slider: t("compare.slider"),
+            },
+          }}
+          alt={t("compare.title", { label: t(pickedTile.label) })}
+          title={t("compare.title", { label: t(pickedTile.label) })}
+          closeLabel={t("cap.close")}
+          onClose={() => setComparing(false)}
+        />
+      )}
       {sheet && (
         <Lightbox
           src={frameImageUrl(sheet)}

@@ -1,4 +1,4 @@
-import { mkdir, rm } from "node:fs/promises";
+import { mkdir, rename, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runFfmpeg } from "./exec";
@@ -35,4 +35,37 @@ export async function makeFixtures(): Promise<Fixtures> {
     vfr,
   ]);
   return { dir, cfr, silent, vfr, cleanup: () => rm(dir, { recursive: true, force: true }) };
+}
+
+const LOSSLESS = ["-c:v", "libx264", "-qp", "0", "-pix_fmt", "yuv420p", "-g", "10"];
+
+export interface RenderOptions {
+  box?: [number, number];
+  seconds?: number;
+}
+
+export async function renderClip(dest: string, opts: RenderOptions = {}) {
+  const filters = opts.box
+    ? [
+        "-vf",
+        `drawbox=x=10:y=10:w=60:h=40:color=red:t=fill:enable='between(n,${opts.box[0]},${opts.box[1]})'`,
+      ]
+    : [];
+  await runFfmpeg([
+    "-f",
+    "lavfi",
+    "-i",
+    "testsrc2=size=160x90:rate=25",
+    ...filters,
+    ...LOSSLESS,
+    "-t",
+    String(opts.seconds ?? 2),
+    dest,
+  ]);
+}
+
+export async function renderByRename(dest: string, opts: RenderOptions) {
+  const tmp = `${dest}.new.mp4`;
+  await renderClip(tmp, opts);
+  await rename(tmp, dest);
 }

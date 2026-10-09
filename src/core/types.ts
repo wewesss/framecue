@@ -8,6 +8,12 @@ export interface Region {
   h: number;
 }
 
+export interface ItemAfter {
+  sha256: string;
+  capturedAt: string;
+  images: string[];
+}
+
 export interface Item {
   id: string;
   video: { path: string; sha256: string };
@@ -21,6 +27,7 @@ export interface Item {
   priority: number;
   status: ItemStatus;
   images: string[];
+  after?: ItemAfter | null;
   agentNote: string | null;
   createdAt: string;
   updatedAt: string;
@@ -45,4 +52,27 @@ export interface AudioInfo {
   sampleRate: number;
   channels: number;
   channelLayout: string | null;
+}
+
+export interface TimingSnapshot {
+  fps: number;
+  frameCount: number;
+}
+
+export interface TimingChange {
+  from: TimingSnapshot;
+  to: TimingSnapshot;
+}
+
+export interface RenderSkip {
+  id: string;
+  reason: string;
+}
+
+export interface RenderEvent {
+  sha256: string;
+  info: VideoInfo;
+  capturedIds: string[];
+  skipped: RenderSkip[];
+  timingChanged?: TimingChange;
 }

@@ -8,6 +8,7 @@ import {
   dragProgress,
   passedThreshold,
 } from "./switchLogic";
+import { clampWipe, wipeFromKey, wipeFromPointer } from "./wipe";
 
 describe("switch drag logic", () => {
   test("threshold is 4 px either way", () => {
@@ -110,5 +111,30 @@ describe("placement", () => {
     const anchor = { top: 10, left: 300, width: 40, height: 28 };
     expect(anchoredPosition(anchor, "left", 1000)).toEqual({ top: 44, left: 300 });
     expect(anchoredPosition(anchor, "right", 1000)).toEqual({ top: 44, right: 660 });
+  });
+});
+
+describe("wipe divider", () => {
+  test("clamps to 0..100", () => {
+    expect(clampWipe(-5)).toBe(0);
+    expect(clampWipe(120)).toBe(100);
+    expect(clampWipe(42)).toBe(42);
+  });
+
+  test("pointer maps to a percentage of the width", () => {
+    expect(wipeFromPointer(150, 100, 200)).toBe(25);
+    expect(wipeFromPointer(50, 100, 200)).toBe(0);
+    expect(wipeFromPointer(900, 100, 200)).toBe(100);
+    expect(wipeFromPointer(10, 0, 0)).toBe(50);
+  });
+
+  test("arrows move by 2 %, 10 % with shift", () => {
+    expect(wipeFromKey("ArrowLeft", 50, false)).toBe(48);
+    expect(wipeFromKey("ArrowRight", 50, false)).toBe(52);
+    expect(wipeFromKey("ArrowRight", 50, true)).toBe(60);
+    expect(wipeFromKey("ArrowLeft", 3, true)).toBe(0);
+    expect(wipeFromKey("Home", 50, false)).toBe(0);
+    expect(wipeFromKey("End", 50, false)).toBe(100);
+    expect(wipeFromKey("a", 50, false)).toBeNull();
   });
 });

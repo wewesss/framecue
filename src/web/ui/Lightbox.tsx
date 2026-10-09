@@ -1,16 +1,24 @@
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { IconButton } from "./Button";
+import { type CompareLabels, CompareView } from "./CompareView";
+
+export interface LightboxCompare {
+  before: string;
+  after: string;
+  labels: CompareLabels;
+}
 
 interface LightboxProps {
-  src: string;
+  src?: string;
+  compare?: LightboxCompare;
   alt: string;
   title: string;
   closeLabel: string;
   onClose: () => void;
 }
 
-export function Lightbox({ src, alt, title, closeLabel, onClose }: LightboxProps) {
+export function Lightbox({ src, compare, alt, title, closeLabel, onClose }: LightboxProps) {
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
   const button = useRef<HTMLDivElement>(null);
@@ -40,8 +48,14 @@ export function Lightbox({ src, alt, title, closeLabel, onClose }: LightboxProps
         aria-label={closeLabel}
         onClick={onClose}
       />
-      <figure className="lightbox__figure">
-        <img className="lightbox__image" src={src} alt={alt} />
+      <figure
+        className={compare ? "lightbox__figure lightbox__figure--compare" : "lightbox__figure"}
+      >
+        {compare ? (
+          <CompareView before={compare.before} after={compare.after} labels={compare.labels} />
+        ) : (
+          <img className="lightbox__image" src={src} alt={alt} />
+        )}
         <div ref={button} className="lightbox__close">
           <IconButton icon="xmark" label={closeLabel} onClick={onClose} />
         </div>

@@ -68,16 +68,18 @@ export function Overview({ tl, items, frame }: OverviewProps) {
       onPointerUp={() => setDrag(false)}
       onPointerCancel={() => setDrag(false)}
     >
-      {items.map((item) => (
-        <i
-          key={item.id}
-          className="ov__mark"
-          style={{
-            left: pct((item.frameStart + item.frameEnd + 1) / 2),
-            background: `var(--status-${item.status})`,
-          }}
-        />
-      ))}
+      {items
+        .filter((item) => item.frameStart < count)
+        .map((item) => (
+          <i
+            key={item.id}
+            className="ov__mark"
+            style={{
+              left: pct((item.frameStart + item.frameEnd + 1) / 2),
+              background: `var(--status-${item.status})`,
+            }}
+          />
+        ))}
       <i className="ov__playhead" style={{ left: pct(frame + 0.5) }} />
       <Tooltip tip={t("tools.overviewWindow")} keys={[[t("key.shift"), t("tools.wheel")]]}>
         <div

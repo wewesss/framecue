@@ -25,6 +25,10 @@ export function formatTimecode(frame: number, fps: number): string {
   return `${p(Math.floor(totalSeconds / 3600))}:${p(Math.floor(totalSeconds / 60) % 60)}:${p(totalSeconds % 60)}:${p(ff)}`;
 }
 
+export function itemTimecode(item: { fps: number }, frame: number): string {
+  return formatTimecode(frame, item.fps);
+}
+
 export function stepTarget(
   base: number,
   pending: number | null,

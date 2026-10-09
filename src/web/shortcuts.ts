@@ -17,7 +17,9 @@ export type Action =
   | "zoomIn"
   | "zoomOut"
   | "fit"
-  | "snap";
+  | "snap"
+  | "verify"
+  | "reopen";
 
 export interface KeyInput {
   key: string;
@@ -46,6 +48,8 @@ const resolve = matcher<KeyInput, Action | null>()
   .with({ key: P.union("-", "_") }, () => "zoomOut")
   .with({ key: P.union("z", "Z"), shift: true }, () => "fit")
   .with({ key: P.union("s", "S") }, () => "snap")
+  .with({ key: P.union("v", "V") }, () => "verify")
+  .with({ key: P.union("x", "X") }, () => "reopen")
   .otherwise(() => null);
 
 export function shortcutAction(input: KeyInput): Action | null {

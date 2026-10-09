@@ -101,7 +101,7 @@ export const fr = {
   "detail.before": "Avant",
   "detail.after": "Après",
   "detail.beforeTip": "Rendu capturé",
-  "detail.afterTip": "Après un nouveau rendu (étape 5)",
+  "detail.afterTip": "Images du dernier rendu",
   "detail.added": "Ajouté {ago}",
   "detail.justNow": "à l'instant",
   "detail.confirm": "Supprimer l'élément #{n} ?",
@@ -270,6 +270,48 @@ export const fr = {
   "help.agent.mcp": "MCP",
   "help.agent.mcpBody":
     "<c>framecue mcp</c> (stdio) : <c>list_items</c>, <c>next_item</c>, <c>get_item</c>, <c>mark_fixed</c>. L'agent ne peut que marquer Corrigé ; vous seul validez.",
+  "toast.render": "Nouveau rendu détecté",
+  "toast.toVerifyOne": "1 élément à vérifier",
+  "toast.toVerifyMany": "{n} éléments à vérifier",
+  "toast.skippedOne": "1 élément hors du nouveau rendu",
+  "toast.skippedMany": "{n} éléments hors du nouveau rendu",
+  "toast.timing":
+    "La fréquence ou le nombre d'images a changé ({from} → {to}) : les numéros d'image peuvent ne plus correspondre.",
+  "toast.see": "Voir",
+  "toast.dismiss": "Fermer",
+
+  "detail.afterNoneTip": "Pas d'images après rendu : recapturez-les ou attendez un nouveau rendu",
+  "detail.afterMeta": "Rendu {sha} · {time}",
+  "detail.compareOpen": "Comparer",
+  "detail.compareTip": "Avant et après de la capture sélectionnée",
+  "detail.recapture": "Recapturer l'après",
+  "detail.recaptureTip": "Extraire ces images dans le rendu actuel",
+  "detail.recapturing": "Capture…",
+
+  "verify.label": "Vérification",
+  "verify.verified": "Vérifié",
+  "verify.reopen": "Rouvrir",
+  "verify.verifiedTip": "La correction est bonne",
+  "verify.reopenTip": "Toujours faux : repart chez l'agent",
+  "verify.done": "Tout est vérifié",
+  "verify.doneBody": "Plus aucun élément corrigé n'attend de vérification.",
+
+  "queue.afterDot": "Après dispo",
+  "queue.afterDotTip": "Images après rendu disponibles : à vérifier",
+
+  "compare.title": "Avant / Après · {label}",
+  "compare.mode": "Mode de comparaison",
+  "compare.side": "Côte à côte",
+  "compare.wipe": "Volet",
+  "compare.slider": "Position du volet",
+
+  "help.group.verify": "Vérification",
+  "help.verify": "Marquer l'élément Vérifié",
+  "help.reopen": "Rouvrir l'élément",
+  "help.verifyNote":
+    "quand il est Corrigé et que ses images après rendu sont là ; passe au suivant",
+  "help.compareKeys": "Déplacer le volet dans la comparaison",
+  "help.compareKeysNote": "avec Maj : par pas de 10 % ; Échap ferme",
 };
 
 export type TKey = keyof typeof fr;

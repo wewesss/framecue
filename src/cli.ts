@@ -84,6 +84,24 @@ try {
     workspaceDir: values.dir ? resolve(values.dir) : undefined,
     port,
     dev: values.dev ?? false,
+    onRender: (event) => {
+      const n = event.capturedIds.length;
+      console.log(
+        `Render:     new render detected (${event.sha256.slice(0, 8)}), ${n} fixed item(s) to verify`,
+      );
+      for (const skip of event.skipped) console.error(`Skipped ${skip.id}: ${skip.reason}`);
+      if (event.timingChanged) {
+        const { from, to } = event.timingChanged;
+        console.error(
+          `Timing changed: ${from.fps} fps / ${from.frameCount} frames -> ${to.fps} fps / ${to.frameCount} frames; frame numbers may no longer line up.`,
+        );
+      }
+    },
+    onRenderError: (error) => {
+      console.error(
+        `Render check failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    },
   });
   const { info } = running;
 

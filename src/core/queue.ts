@@ -1,6 +1,7 @@
-import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { captureItemImages } from "./frames";
+import { afterDirName, captureAfter } from "./render";
 import { frameToTimecode } from "./timecode";
 import type { Item, ItemKind, ItemStatus, Region, VideoInfo } from "./types";
 
@@ -50,7 +51,9 @@ export async function readQueue(root: string): Promise<Item[]> {
   text.split(/\r?\n/).forEach((line, i) => {
     if (!line.trim()) return;
     try {
-      items.push(JSON.parse(line) as Item);
+      const item = JSON.parse(line) as Item;
+      item.after ??= null;
+      items.push(item);
     } catch (error) {
       throw new Error(`Invalid JSON in ${QUEUE_FILE} at line ${i + 1}: ${String(error)}`);
     }
@@ -124,6 +127,7 @@ export function createItem(root: string, input: CreateItemInput): Promise<Item> 
       priority: items.reduce((m, it) => Math.max(m, it.priority), -1) + 1,
       status: "todo",
       images: images.map((name) => `frames/${id}/${name}`),
+      after: null,
       agentNote: null,
       createdAt: now,
       updatedAt: now,
@@ -200,5 +204,55 @@ export function reorder(root: string, ids: string[]): Promise<Item[]> {
     });
     await writeQueue(root, ordered);
     return ordered;
+  });
+}
+
+export function attachAfter(
+  root: string,
+  id: string,
+  render: { videoPath: string; sha256: string; frameCount: number },
+): Promise<Item> {
+  return withLock(root, async () => {
+    const items = await readQueue(root);
+    const item = items.find((it) => it.id === id);
+    if (!item) throw new Error(`Item not found: ${id}`);
+    const images = await captureAfter(root, item, render.videoPath, render.sha256, {
+      frameCount: render.frameCount,
+    });
+    const keep = afterDirName(render.sha256);
+    const itemDir = join(root, "frames", id);
+    for (const entry of await readdir(itemDir)) {
+      if (entry.startsWith("after-") && entry !== keep) {
+        await rm(join(itemDir, entry), { recursive: true, force: true });
+      }
+    }
+    const now = new Date().toISOString();
+    item.after = { sha256: render.sha256, capturedAt: now, images };
+    item.updatedAt = now;
+    await writeQueue(root, items);
+    return item;
+  });
+}
+
+export function clearAfter(root: string, id: string): Promise<Item> {
+  return withLock(root, async () => {
+    const items = await readQueue(root);
+    const item = items.find((it) => it.id === id);
+    if (!item) throw new Error(`Item not found: ${id}`);
+    const itemDir = join(root, "frames", id);
+    let entries: string[] = [];
+    try {
+      entries = await readdir(itemDir);
+    } catch {}
+    for (const entry of entries) {
+      if (entry.startsWith("after-"))
+        await rm(join(itemDir, entry), { recursive: true, force: true });
+    }
+    if (item.after != null) {
+      item.after = null;
+      item.updatedAt = new Date().toISOString();
+      await writeQueue(root, items);
+    }
+    return item;
   });
 }

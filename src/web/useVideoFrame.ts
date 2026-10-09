@@ -64,6 +64,7 @@ export function useVideoFrame(
     video.addEventListener("play", onPlay);
     video.addEventListener("pause", onPause);
     video.addEventListener("ended", onPause);
+    video.addEventListener("emptied", onPause);
     setPlaying(!video.paused);
 
     return () => {
@@ -74,6 +75,7 @@ export function useVideoFrame(
       video.removeEventListener("play", onPlay);
       video.removeEventListener("pause", onPause);
       video.removeEventListener("ended", onPause);
+      video.removeEventListener("emptied", onPause);
     };
   }, [videoRef, fps, frameCount, commit]);
 

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { frameToSeekTime, reconcileShown, stepTarget, timeToFrame } from "./frame";
+import { frameToSeekTime, itemTimecode, reconcileShown, stepTarget, timeToFrame } from "./frame";
 import { moveItem } from "./order";
 import { shortcutAction } from "./shortcuts";
 
@@ -66,6 +66,13 @@ describe("shortcutAction", () => {
     expect(shortcutAction(key("Escape"))).toBe("clear");
   });
 
+  test("verification shortcuts", () => {
+    expect(shortcutAction(key("v"))).toBe("verify");
+    expect(shortcutAction(key("V"))).toBe("verify");
+    expect(shortcutAction(key("x"))).toBe("reopen");
+    expect(shortcutAction(key("v", { mod: true }))).toBeNull();
+  });
+
   test("plain arrows belong to the navigation layer", () => {
     expect(shortcutAction(key("ArrowLeft"))).toBeNull();
     expect(shortcutAction(key("ArrowRight"))).toBeNull();
@@ -113,5 +120,13 @@ describe("reconcileShown", () => {
   });
   test("settles when the pending frame is shown", () => {
     expect(reconcileShown(5, 5)).toEqual({ pending: null, adopt: true });
+  });
+});
+
+describe("itemTimecode", () => {
+  test("uses the item own fps, not the current video one", () => {
+    expect(itemTimecode({ fps: 25 }, 120)).toBe("00:00:04:20");
+    expect(itemTimecode({ fps: 30 }, 120)).toBe("00:00:04:00");
+    expect(itemTimecode({ fps: 29.97 }, 1800)).toBe("00:01:00:00");
   });
 });

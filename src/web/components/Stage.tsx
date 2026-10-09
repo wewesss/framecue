@@ -1,7 +1,7 @@
 import classigo from "classigo";
 import { type PointerEvent, type RefObject, useCallback, useEffect, useRef, useState } from "react";
 import type { Region } from "../../core/types";
-import { streamUrl } from "../api";
+import { videoSrc } from "../api";
 import { useT } from "../i18n";
 import {
   activePreset,
@@ -22,7 +22,7 @@ import { RegionOverlay } from "./RegionOverlay";
 
 interface StageProps {
   videoRef: RefObject<HTMLVideoElement | null>;
-  video: { width: number; height: number };
+  video: { width: number; height: number; sha256: string };
   region: Region | null;
   regionMode: boolean;
   onRegion: (region: Region) => void;
@@ -155,7 +155,13 @@ export function Stage({ videoRef, video, region, regionMode, onRegion }: StagePr
         className="stage__picture"
         style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h }}
       >
-        <video ref={videoRef} className="stage__video" src={streamUrl} preload="auto" muted>
+        <video
+          ref={videoRef}
+          className="stage__video"
+          src={videoSrc(video.sha256)}
+          preload="auto"
+          muted
+        >
           <track kind="captions" />
         </video>
         <RegionOverlay video={video} region={region} active={regionMode} onCommit={onRegion} />

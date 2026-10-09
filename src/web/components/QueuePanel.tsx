@@ -2,7 +2,7 @@ import classigo from "classigo";
 import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { Item, ItemKind, ItemStatus } from "../../core/types";
 import { shortTimecode } from "../format";
-import { formatTimecode } from "../frame";
+import { itemTimecode } from "../frame";
 import { Rich, useI18n } from "../i18n";
 import { mapFilteredToFull } from "../sortable";
 import { kindIcon, STATUSES, statusIcon, statusLabelKey } from "../status";
@@ -11,13 +11,13 @@ import { Icon } from "../ui/Icon";
 import { SegmentedControl, type SegmentOption } from "../ui/SegmentedControl";
 import { Tooltip } from "../ui/Tooltip";
 import { useSortable } from "../useSortable";
+import { needsVerification, verifyCount } from "../verify";
 import { StatusTag } from "./StatusTag";
 
 export type Filter = ItemStatus | "all";
 
 interface QueuePanelProps {
   items: Item[];
-  fps: number;
   selectedId: string | null;
   filter: Filter;
   onFilter: (filter: Filter) => void;
@@ -29,7 +29,6 @@ const kindKey = (kind: ItemKind) => `kind.${kind}` as const;
 
 export function QueuePanel({
   items,
-  fps,
   selectedId,
   filter,
   onFilter,
@@ -180,13 +179,13 @@ export function QueuePanel({
                   </div>
                   <div className="row__meta">
                     <span className="num">
-                      {shortTimecode(formatTimecode(item.frameStart, fps))}
+                      {shortTimecode(itemTimecode(item, item.frameStart))}
                     </span>
                     {isRange && (
                       <>
                         <span className="row__sep">→</span>
                         <span className="num">
-                          {shortTimecode(formatTimecode(item.frameEnd, fps))}
+                          {shortTimecode(itemTimecode(item, item.frameEnd))}
                         </span>
                       </>
                     )}
@@ -197,6 +196,11 @@ export function QueuePanel({
                       </span>
                     </Tooltip>
                     <span>{t("unit.frames", { n: item.frameEnd - item.frameStart + 1 })}</span>
+                    {needsVerification(item) && (
+                      <Tooltip tip={t("queue.afterDotTip")}>
+                        <span className="row__after" role="img" aria-label={t("queue.afterDot")} />
+                      </Tooltip>
+                    )}
                   </div>
                 </div>
                 <StatusTag status={item.status} />
@@ -210,7 +214,7 @@ export function QueuePanel({
       </div>
       <footer className="queue__foot">
         <span>
-          <Rich id="queue.summary" vars={{ todo: toDo, fixed: counts.fixed }} />
+          <Rich id="queue.summary" vars={{ todo: toDo, fixed: verifyCount(items) }} />
         </span>
         <div className="spacer" />
         <Tooltip tip={t("queue.copyTip")}>

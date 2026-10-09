@@ -1,9 +1,13 @@
 import { extname, join, normalize, resolve } from "node:path";
 import { matcher, P } from "matchigo";
 import {
+  attachAfter,
+  clearAfter,
   computePeaks,
+  createFsRenderSource,
   createItem,
   deleteItem,
+  FrameOutOfRangeError,
   type Item,
   type ItemKind,
   type ItemPatch,
@@ -11,10 +15,14 @@ import {
   type Peaks,
   probeVideo,
   type Region,
+  type RenderEvent,
+  type RenderSkip,
+  type RenderSource,
   readQueue,
   reorder,
   resolveWorkspace,
   sha256File,
+  type TimingChange,
   updateItem,
   type VideoInfo,
 } from "../core";
@@ -24,6 +32,8 @@ const webRoot = resolve(import.meta.dir, "../../dist/web");
 const DEFAULT_PORT = 5730;
 const PORT_ATTEMPTS = 10;
 const VITE_PORT = 5173;
+
+const KEEP_ALIVE_MS = 20_000;
 
 const KINDS: ItemKind[] = ["frame", "range", "region"];
 const STATUSES: ItemStatus[] = ["todo", "fixed", "verified", "reopened"];
@@ -50,12 +60,17 @@ export interface StartServerOptions {
   workspaceDir?: string;
   port?: number;
   dev?: boolean;
+  watch?: boolean;
+  renderSource?: RenderSource;
+  keepAliveMs?: number;
+  onRender?: (event: RenderEvent) => void;
+  onRenderError?: (error: unknown) => void;
 }
 
 export interface RunningServer {
   server: Bun.Server<undefined>;
   url: string;
-  info: VideoInfo;
+  readonly info: VideoInfo;
   workspace: string;
   stop(): void;
 }
@@ -69,6 +84,8 @@ interface Ctx {
   info: VideoInfo;
   sha256: string;
   workspace: string;
+  events: () => Response;
+  capture: (id: string) => Promise<Item>;
 }
 
 class HttpError extends Error {
@@ -91,6 +108,7 @@ function fail(status: number, message: string): never {
 function errorResponse(error: unknown): Response {
   if (error instanceof HttpError) return json({ error: error.message }, error.status);
   const message = error instanceof Error ? error.message : String(error);
+  if (error instanceof FrameOutOfRangeError) return json({ error: message }, 409);
   if (message.startsWith("Item not found")) return json({ error: message }, 404);
   if (message.startsWith("Invalid status transition")) return json({ error: message }, 409);
   if (BAD_REQUEST_PREFIXES.some((p) => message.startsWith(p))) {
@@ -176,7 +194,7 @@ function streamVideo({ request, info }: Ctx): Response {
   const file = Bun.file(info.path);
   const size = file.size;
   const type = MIME[extname(info.path).toLowerCase()] ?? "application/octet-stream";
-  const base = { "Content-Type": type, "Accept-Ranges": "bytes" };
+  const base = { "Content-Type": type, "Accept-Ranges": "bytes", "Cache-Control": "no-cache" };
   const rangeHeader = request.headers.get("range");
   if (rangeHeader === null) {
     return new Response(file, { headers: { ...base, "Content-Length": String(size) } });
@@ -244,6 +262,15 @@ async function patchItem({ request, parts, workspace }: Ctx): Promise<Response> 
   return json(await updateItem(workspace, parts[2] as string, patch, { actor: "user" }));
 }
 
+async function recaptureAfter({ parts, capture }: Ctx): Promise<Response> {
+  const item = await capture(parts[2] as string);
+  return json(item);
+}
+
+function openEvents({ events }: Ctx): Response {
+  return events();
+}
+
 async function removeItem({ parts, workspace }: Ctx): Promise<Response> {
   await deleteItem(workspace, parts[2] as string);
   return new Response(null, { status: 204 });
@@ -258,11 +285,17 @@ async function reorderItems({ request, workspace }: Ctx): Promise<Response> {
 }
 
 async function serveFrame({ parts, workspace }: Ctx): Promise<Response> {
-  const [, , id, name] = parts as [string, string, string, string];
-  if (!/^[A-Za-z0-9_-]+$/.test(id) || !/^[A-Za-z0-9_.-]+\.png$/.test(name) || name.includes("..")) {
-    fail(400, "Invalid frame path");
-  }
-  const file = Bun.file(join(workspace, "frames", id, name));
+  const [, , id, ...rest] = parts as [string, string, string, ...string[]];
+  const name = rest.pop() as string;
+  const dir = rest[0];
+  const valid =
+    /^[A-Za-z0-9_-]+$/.test(id) &&
+    /^[A-Za-z0-9_.-]+\.png$/.test(name) &&
+    !name.includes("..") &&
+    rest.length <= 1 &&
+    (dir === undefined || /^after-[0-9a-f]{8}$/.test(dir));
+  if (!valid) fail(400, "Invalid frame path");
+  const file = Bun.file(join(workspace, "frames", id, ...(dir ? [dir] : []), name));
   if (!(await file.exists())) fail(404, "Frame not found");
   return new Response(file, {
     headers: { "Content-Type": "image/png", "Cache-Control": "no-store" },
@@ -278,8 +311,14 @@ const dispatch = matcher<Ctx, Response | Promise<Response>>()
   .with({ method: "POST", parts: P.tuple("api", "items") }, postItem)
   .with({ method: "POST", parts: P.tuple("api", "items", "reorder") }, reorderItems)
   .with({ method: "PATCH", parts: P.tuple("api", "items", P.string) }, patchItem)
+  .with({ method: "POST", parts: P.tuple("api", "items", P.string, "after") }, recaptureAfter)
   .with({ method: "DELETE", parts: P.tuple("api", "items", P.string) }, removeItem)
+  .with({ method: "GET", parts: P.tuple("api", "events") }, openEvents)
   .with({ method: "GET", parts: P.tuple("api", "frames", P.string, P.string) }, serveFrame)
+  .with(
+    { method: "GET", parts: P.tuple("api", "frames", P.string, P.string, P.string) },
+    serveFrame,
+  )
   .with({ parts: P.when((p) => Array.isArray(p) && p[0] === "api") }, () => fail(404, "Not found"))
   .otherwise(serveStatic);
 
@@ -315,7 +354,7 @@ function decodeParts(pathname: string): string[] | null {
 
 function listen(
   port: number,
-  fetch: (request: Request) => Promise<Response>,
+  fetch: (request: Request, server: Bun.Server<undefined>) => Promise<Response>,
 ): Bun.Server<undefined> {
   const attempts = port === 0 ? 1 : PORT_ATTEMPTS + 1;
   let last: unknown;
@@ -332,24 +371,139 @@ function listen(
   );
 }
 
+function timingChange(before: VideoInfo, after: VideoInfo): TimingChange | undefined {
+  if (before.fps === after.fps && before.frameCount === after.frameCount) return undefined;
+  return {
+    from: { fps: before.fps, frameCount: before.frameCount },
+    to: { fps: after.fps, frameCount: after.frameCount },
+  };
+}
+
+type Send = (name: string, data: unknown) => void;
+
 export async function startServer({
   videoPath,
   workspaceDir,
   port = DEFAULT_PORT,
   dev = false,
+  watch = true,
+  renderSource,
+  keepAliveMs = KEEP_ALIVE_MS,
+  onRender,
+  onRenderError,
 }: StartServerOptions): Promise<RunningServer> {
-  const info = await probeVideo(videoPath);
   const { root: workspace } = await resolveWorkspace(videoPath, workspaceDir);
-  const sha256 = await sha256File(videoPath);
+  const state = { info: await probeVideo(videoPath), sha256: await sha256File(videoPath) };
 
-  let peaksInFlight: Promise<Peaks | null> | null = null;
+  let peaksInFlight: { sha256: string; promise: Promise<Peaks | null> } | null = null;
   const peaks = () => {
+    const { info, sha256 } = state;
     if (info.audio === null) return Promise.resolve(null);
-    peaksInFlight ??= computePeaks(info.path, { workspace, sha256 }).finally(() => {
-      peaksInFlight = null;
-    });
-    return peaksInFlight;
+    if (peaksInFlight?.sha256 !== sha256) {
+      const promise = computePeaks(info.path, { workspace, sha256 }).finally(() => {
+        if (peaksInFlight?.promise === promise) peaksInFlight = null;
+      });
+      peaksInFlight = { sha256, promise };
+    }
+    return (peaksInFlight as { promise: Promise<Peaks | null> }).promise;
   };
+
+  const subscribers = new Set<Send>();
+  const openStreams = new Set<() => void>();
+  const broadcast: Send = (name, data) => {
+    for (const send of [...subscribers]) send(name, data);
+  };
+
+  const encoder = new TextEncoder();
+  const eventStream = (request: Request, server: Bun.Server<undefined>): Response => {
+    server.timeout(request, 0);
+    let cleanup = () => {};
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        const write = (text: string) => {
+          try {
+            controller.enqueue(encoder.encode(text));
+          } catch {
+            cleanup();
+          }
+        };
+        const send: Send = (name, data) =>
+          write(`event: ${name}\ndata: ${JSON.stringify(data)}\n\n`);
+        const keepAlive = setInterval(() => write(": keep-alive\n\n"), keepAliveMs);
+        cleanup = () => {
+          clearInterval(keepAlive);
+          subscribers.delete(send);
+          openStreams.delete(cleanup);
+          request.signal.removeEventListener("abort", cleanup);
+        };
+        subscribers.add(send);
+        openStreams.add(cleanup);
+        request.signal.addEventListener("abort", cleanup);
+        write("retry: 2000\n: connected\n\n");
+      },
+      cancel() {
+        cleanup();
+      },
+    });
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream; charset=utf-8",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive",
+      },
+    });
+  };
+
+  const capture = async (id: string): Promise<Item> => {
+    const { info, sha256 } = state;
+    const item = await attachAfter(workspace, id, {
+      videoPath: info.path,
+      sha256,
+      frameCount: info.frameCount,
+    });
+    broadcast("items", { ids: [id] });
+    return item;
+  };
+
+  const processRender = async () => {
+    const previous = state.info;
+    const info = await probeVideo(videoPath);
+    const sha256 = await sha256File(videoPath);
+    if (sha256 === state.sha256) return;
+    state.info = info;
+    state.sha256 = sha256;
+    const capturedIds: string[] = [];
+    const skipped: RenderSkip[] = [];
+    for (const item of await readQueue(workspace)) {
+      if (item.status !== "fixed") continue;
+      try {
+        await attachAfter(workspace, item.id, {
+          videoPath: info.path,
+          sha256,
+          frameCount: info.frameCount,
+        });
+        capturedIds.push(item.id);
+      } catch (error) {
+        await clearAfter(workspace, item.id).catch(() => undefined);
+        skipped.push({
+          id: item.id,
+          reason: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+    const event: RenderEvent = { sha256, info, capturedIds, skipped };
+    const timingChanged = timingChange(previous, info);
+    if (timingChanged) event.timingChanged = timingChanged;
+    broadcast("render", event);
+    broadcast("items", { ids: [...capturedIds, ...skipped.map((s) => s.id)] });
+    onRender?.(event);
+  };
+
+  let renders: Promise<void> = Promise.resolve();
+  const source = renderSource ?? (watch ? createFsRenderSource(videoPath) : null);
+  const unsubscribe = source?.onRender(() => {
+    renders = renders.then(processRender).catch((error) => onRenderError?.(error));
+  });
 
   let boundPort = 0;
 
@@ -363,16 +517,31 @@ export async function startServer({
     return allowed.includes(origin);
   };
 
-  const server = listen(port, async (request) => {
+  const server = listen(port, async (request, bunServer) => {
     if (!hostAllowed(request.headers.get("host"))) return json({ error: "Forbidden host" }, 403);
     const method = request.method;
-    if (method !== "GET" && method !== "HEAD" && !originAllowed(request.headers.get("origin"))) {
+    const origin = request.headers.get("origin");
+    if (method !== "GET" && method !== "HEAD" && !originAllowed(origin)) {
       return json({ error: "Forbidden origin" }, 403);
     }
     const url = new URL(request.url);
     const parts = decodeParts(url.pathname);
     if (!parts) return json({ error: "Invalid path" }, 400);
-    const ctx: Ctx = { peaks, method, parts, request, url, info, sha256, workspace };
+    if (parts[0] === "api" && parts[1] === "events" && !originAllowed(origin)) {
+      return json({ error: "Forbidden origin" }, 403);
+    }
+    const ctx: Ctx = {
+      peaks,
+      method,
+      parts,
+      request,
+      url,
+      info: state.info,
+      sha256: state.sha256,
+      workspace,
+      events: () => eventStream(request, bunServer),
+      capture,
+    };
     try {
       return await dispatch(ctx);
     } catch (error) {
@@ -384,9 +553,14 @@ export async function startServer({
   return {
     server,
     url: `http://127.0.0.1:${boundPort}`,
-    info,
+    get info() {
+      return state.info;
+    },
     workspace,
     stop: () => {
+      unsubscribe?.();
+      if (!renderSource) source?.close();
+      for (const close of [...openStreams]) close();
       server.stop(true);
     },
   };

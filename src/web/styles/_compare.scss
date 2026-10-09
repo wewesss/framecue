@@ -1,0 +1,120 @@
+.lightbox__figure--compare {
+  max-width: 96vw;
+}
+
+.compare {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+
+  &__bar {
+    display: flex;
+    justify-content: center;
+    padding: 3px;
+    border-radius: var(--fc-radius-full);
+    background: var(--fc-glass-solid);
+    box-shadow: var(--fc-shadow-1);
+  }
+
+  &__side {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  &__pane {
+    position: relative;
+    margin: 0;
+  }
+
+  &__img {
+    display: block;
+    max-width: 100%;
+    max-height: 78vh;
+    border-radius: var(--fc-radius-sm);
+    background: #000;
+    box-shadow: var(--fc-shadow-glass);
+    user-select: none;
+  }
+
+  &__side &__img {
+    width: 100%;
+    max-width: 46vw;
+  }
+
+  &__chip {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    padding: 2px 8px;
+    border-radius: var(--fc-radius-full);
+    background: var(--fc-glass-solid);
+    box-shadow: var(--fc-shadow-1);
+    color: var(--text);
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    pointer-events: none;
+
+    &--after {
+      right: 8px;
+      left: auto;
+    }
+  }
+
+  &__wipe {
+    --wipe: 50%;
+
+    position: relative;
+    display: inline-block;
+    max-width: min(92vw, 1600px);
+    cursor: ew-resize;
+    touch-action: none;
+  }
+
+  &__wipe &__img {
+    max-width: min(92vw, 1600px);
+  }
+
+  &__img--before {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    clip-path: inset(0 calc(100% - var(--wipe)) 0 0);
+    pointer-events: none;
+  }
+
+  &__handle {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: var(--wipe);
+    width: 3px;
+    margin-left: -1.5px;
+    background: var(--accent);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+    outline: none;
+
+    &::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 18px;
+      height: 18px;
+      margin: -9px 0 0 -9px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.35);
+    }
+
+    &:focus-visible::after {
+      box-shadow: 0 0 0 3px var(--fc-focus-ring);
+    }
+  }
+}
+
+.lightbox:has(.lightbox__figure--compare) .lightbox__scrim {
+  background: rgba(0, 0, 0, 0.62);
+}

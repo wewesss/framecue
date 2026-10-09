@@ -1,0 +1,70 @@
+@use "mixins";
+
+@keyframes fc-toast {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -8px) scale(0.97);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+.toast {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  z-index: 40;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: max-content;
+  max-width: min(520px, calc(100% - 24px));
+  padding: 8px 8px 8px 14px;
+  border-radius: var(--fc-radius-popover);
+  color: var(--text);
+  font-size: var(--fs-sm);
+  animation: fc-toast 0.28s var(--fc-ease-out);
+
+  @include mixins.glass-translucent;
+  @include mixins.glass-content;
+
+  &__icon {
+    flex: none;
+    color: var(--accent);
+  }
+
+  &__text {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+
+    small {
+      color: var(--text-muted);
+      font-size: var(--fs-xs);
+    }
+
+    small.toast__warn {
+      color: var(--status-fixed);
+    }
+  }
+
+  &__icon--warn {
+    color: var(--status-fixed);
+  }
+
+  .btn {
+    flex: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation: none;
+  }
+}

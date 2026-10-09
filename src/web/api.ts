@@ -1,4 +1,4 @@
-import type { Item, ItemKind, ItemStatus, Region, VideoInfo } from "../core/types";
+import type { Item, ItemKind, ItemStatus, Region, RenderEvent, VideoInfo } from "../core/types";
 
 export interface VideoResponse extends VideoInfo {
   sha256: string;
@@ -49,11 +49,34 @@ export const api = {
     }),
   remove: (id: string) =>
     request<void>(`/api/items/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  recaptureAfter: (id: string) =>
+    request<Item>(`/api/items/${encodeURIComponent(id)}/after`, { method: "POST" }),
   reorder: (ids: string[]) =>
     request<Item[]>("/api/items/reorder", { method: "POST", body: JSON.stringify({ ids }) }),
 };
 
 export const streamUrl = "/api/video/stream";
+
+export function videoSrc(sha256: string): string {
+  return `${streamUrl}?v=${sha256.slice(0, 16)}`;
+}
+
+export function subscribeEvents(handlers: {
+  render: (event: RenderEvent) => void;
+  items: () => void;
+}): () => void {
+  const source = new EventSource("/api/events");
+  source.addEventListener("render", (event) => {
+    handlers.render(JSON.parse((event as MessageEvent<string>).data) as RenderEvent);
+  });
+  source.addEventListener("items", () => handlers.items());
+  let opened = false;
+  source.addEventListener("open", () => {
+    if (opened) handlers.items();
+    opened = true;
+  });
+  return () => source.close();
+}
 export const peaksUrl = "/api/audio/peaks";
 
 export interface PeaksResponse {
@@ -61,8 +84,8 @@ export interface PeaksResponse {
   data: Int8Array;
 }
 
-export async function fetchPeaks(): Promise<PeaksResponse | null> {
-  const res = await fetch(peaksUrl);
+export async function fetchPeaks(version: string): Promise<PeaksResponse | null> {
+  const res = await fetch(`${peaksUrl}?v=${version.slice(0, 16)}`);
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
   const rate = Number(res.headers.get("X-Peaks-Rate"));
@@ -71,5 +94,5 @@ export async function fetchPeaks(): Promise<PeaksResponse | null> {
 
 export function frameImageUrl(image: string): string {
   const [, id, ...name] = image.split("/");
-  return `/api/frames/${encodeURIComponent(id ?? "")}/${encodeURIComponent(name.join("/"))}`;
+  return `/api/frames/${encodeURIComponent(id ?? "")}/${name.map(encodeURIComponent).join("/")}`;
 }

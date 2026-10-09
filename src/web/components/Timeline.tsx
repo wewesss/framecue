@@ -127,7 +127,7 @@ export function Timeline({
   const { t, lang } = useI18n();
   const { fps, frameCount: count } = video;
   const hasAudio = video.audio !== null;
-  const peaks = usePeaks(hasAudio);
+  const peaks = usePeaks(hasAudio, video.sha256);
   const rootRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<HTMLCanvasElement>(null);
@@ -427,8 +427,8 @@ export function Timeline({
           {items.map((item) => {
             const isRange = item.frameEnd > item.frameStart;
             const x0 = isRange ? xOf(item.frameStart) : xOf(item.frameStart + 0.5);
-            const w = isRange ? Math.max(4, xOf(item.frameEnd + 1) - x0) : 0;
-            if (x0 + w < -12 || x0 > width + 12) return null;
+            const w = isRange ? Math.max(4, Math.min(xOf(item.frameEnd + 1), xOf(count)) - x0) : 0;
+            if (item.frameStart >= count || x0 + w < -12 || x0 > width + 12) return null;
             const selected = item.id === selectedId;
             const number = rank.get(item.id) ?? 0;
             const first = item.comment.split("\n")[0] ?? "";
@@ -457,10 +457,10 @@ export function Timeline({
             );
           })}
           {items.map((item) => {
-            if (item.id !== selectedId) return null;
+            if (item.id !== selectedId || item.frameStart >= count) return null;
             const isRange = item.frameEnd > item.frameStart;
             const x0 = isRange ? xOf(item.frameStart) : xOf(item.frameStart + 0.5);
-            const w = isRange ? Math.max(4, xOf(item.frameEnd + 1) - x0) : 0;
+            const w = isRange ? Math.max(4, Math.min(xOf(item.frameEnd + 1), xOf(count)) - x0) : 0;
             return (
               <span key={item.id} className="mk__num" style={{ left: Math.max(x0, 0) + w + 8 }}>
                 #{rank.get(item.id)}

@@ -232,6 +232,18 @@ export function HelpSheet({ open, onClose }: HelpSheetProps) {
                 note={t("help.longPressNote")}
               />
               <Row lead={t("help.topEdge")} desc={t("help.topEdgeDesc")} />
+              <Group title={t("help.group.verify")} />
+              <Row
+                lead={<Combos of={[["V"]]} />}
+                desc={t("help.verify")}
+                note={t("help.verifyNote")}
+              />
+              <Row lead={<Combos of={[["X"]]} />} desc={t("help.reopen")} />
+              <Row
+                lead={<Combos of={[["←"], ["→"]]} />}
+                desc={t("help.compareKeys")}
+                note={t("help.compareKeysNote")}
+              />
               <Group title={t("help.group.nav")} />
               <Row
                 lead={<Combos of={[["↑"], ["↓"], ["←"], ["→"]]} />}

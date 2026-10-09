@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { fetchPeaks, type PeaksResponse } from "../api";
 
-export function usePeaks(enabled: boolean): PeaksResponse | null {
+export function usePeaks(enabled: boolean, version: string): PeaksResponse | null {
   const [peaks, setPeaks] = useState<PeaksResponse | null>(null);
 
   useEffect(() => {
@@ -10,7 +10,7 @@ export function usePeaks(enabled: boolean): PeaksResponse | null {
       return;
     }
     let cancelled = false;
-    fetchPeaks()
+    fetchPeaks(version)
       .then((result) => {
         if (!cancelled) setPeaks(result);
       })
@@ -20,7 +20,7 @@ export function usePeaks(enabled: boolean): PeaksResponse | null {
     return () => {
       cancelled = true;
     };
-  }, [enabled]);
+  }, [enabled, version]);
 
   return peaks;
 }
