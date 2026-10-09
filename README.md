@@ -96,7 +96,7 @@ Both the player and the MCP process write `queue.jsonl`; writes are serialised a
 
 ## Requirements
 
-- Node.js 20 or later, or Bun 1.4 or later
+- Node.js 22 or later, or Bun 1.4 or later
 - ffmpeg 5.1 or later, with ffprobe, on PATH
 - A recent Chromium, Firefox or Safari
 
