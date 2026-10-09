@@ -4,6 +4,29 @@ A local web video player to pick frames, frame ranges or regions, comment on the
 
 Nothing leaves your machine: the server binds to 127.0.0.1 and there is no telemetry.
 
+## Install
+
+Not published to npm yet. Once it is:
+
+```
+npx framecue <video>
+npm i -g framecue
+bunx framecue <video>
+bun add -g framecue
+```
+
+Until then, run it from source:
+
+```
+git clone https://github.com/wewesss/framecue.git
+cd framecue
+bun install
+bun run build
+node dist/cli.js <video>
+```
+
+`bun src/cli.ts <video>` also works without the CLI build (the web UI still needs `bun run build:web`).
+
 ## Usage
 
 ```
@@ -16,7 +39,7 @@ framecue mcp [<video|folder>] [--dir <workspace>]
 - `--no-open`: do not open the browser
 - `--dev`: accept the Vite dev origin (`http://localhost:5173`)
 
-Development: run `bun run dev:server -- <video>` for the API, and `bun run dev` for Vite (proxies `/api` to port 5730).
+Development (Bun only): run `bun run dev:server -- <video>` for the API, and `bun run dev` for Vite (proxies `/api` to port 5730).
 
 ## Agent integration
 
@@ -38,21 +61,27 @@ The chevron next to the button picks the format, or copies every item shown by t
 Claude Code:
 
 ```
-claude mcp add framecue -- bun /absolute/path/to/framecue/src/cli.ts mcp /path/to/video.mp4
+claude mcp add --scope project framecue -- npx -y framecue mcp /path/to/video.mp4
 ```
 
-Any other MCP client (command and args):
+From source: `claude mcp add --scope project framecue -- node /absolute/path/to/framecue/dist/cli.js mcp /path/to/video.mp4`.
+
+Claude Desktop (`claude_desktop_config.json`: `%APPDATA%\Claude\claude_desktop_config.json` on Windows, `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
 
 ```json
 {
   "mcpServers": {
     "framecue": {
-      "command": "bun",
-      "args": ["/absolute/path/to/framecue/src/cli.ts", "mcp", "/path/to/video.mp4"]
+      "command": "npx",
+      "args": ["-y", "framecue", "mcp", "/path/to/video.mp4"]
     }
   }
 }
 ```
+
+If the app does not inherit your `PATH`, give the absolute path of `npx` (or of `node`, with `dist/cli.js` from source) as `command`. On Windows, use `npx.cmd`, or `node.exe` with the absolute path of `cli.js`.
+
+Any other MCP client takes the same command and args; from source use `"command": "node"` and `"args": ["/absolute/path/to/framecue/dist/cli.js", "mcp", "/path/to/video.mp4"]`.
 
 Tools:
 
@@ -67,8 +96,15 @@ Both the player and the MCP process write `queue.jsonl`; writes are serialised a
 
 ## Requirements
 
-- Bun
-- ffmpeg and ffprobe on PATH
+- Node.js 20 or later, or Bun 1.4 or later
+- ffmpeg 5.1 or later, with ffprobe, on PATH
+- A recent Chromium, Firefox or Safari
+
+Install the tools:
+
+- Windows: `winget install Gyan.FFmpeg`, then `winget install OpenJS.NodeJS.LTS` (or Bun: `powershell -c "irm bun.sh/install.ps1 | iex"`)
+- macOS: `brew install ffmpeg node` (or `brew install oven-sh/bun/bun`)
+- Debian/Ubuntu: `sudo apt install ffmpeg`, plus Node.js (NodeSource or nvm) or Bun (`curl -fsSL https://bun.sh/install | bash`)
 
 ## Licence
 
