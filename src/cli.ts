@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { basename, resolve } from "node:path";
 import { parseArgs } from "node:util";
+import { compile } from "matchigo";
 import { startServer } from "./server/server";
 
 const USAGE = `Usage: framecue <video> [--dir <folder>] [--port <n>] [--no-open] [--dev]
@@ -24,13 +25,19 @@ function usage(code: number): never {
   process.exit(code);
 }
 
+interface OpenRequest {
+  platform: string;
+  url: string;
+}
+
+const openCommand = compile<OpenRequest, string[]>([
+  { with: { platform: "win32" }, then: ({ url }: OpenRequest) => ["cmd", "/c", "start", "", url] },
+  { with: { platform: "darwin" }, then: ({ url }: OpenRequest) => ["open", url] },
+  { otherwise: ({ url }) => ["xdg-open", url] },
+]);
+
 function openBrowser(url: string): void {
-  const argv =
-    process.platform === "win32"
-      ? ["cmd", "/c", "start", "", url]
-      : process.platform === "darwin"
-        ? ["open", url]
-        : ["xdg-open", url];
+  const argv = openCommand({ platform: process.platform, url });
   try {
     const [file, ...args] = argv as [string, ...string[]];
     const child = spawn(file, args, { stdio: "ignore", detached: true, windowsHide: true });

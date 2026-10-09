@@ -1,4 +1,4 @@
-import classigo from "classigo";
+import classigo from "classigo/lite";
 import type { ReactNode, RefObject } from "react";
 import { Floating } from "./Floating";
 import type { Align } from "./placement";

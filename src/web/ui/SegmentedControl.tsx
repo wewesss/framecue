@@ -1,6 +1,7 @@
 import classigo from "classigo";
+import { compile } from "matchigo";
 import { type CSSProperties, type KeyboardEvent, type ReactNode, useRef, useState } from "react";
-import { nextEnabled } from "./menuNav";
+import { type NavKey, nextEnabled } from "./menuNav";
 import { type TipKeys, Tooltip } from "./Tooltip";
 
 export interface SegmentOption<V extends string> {
@@ -24,14 +25,15 @@ interface SegmentedControlProps<V extends string> {
   className?: string;
 }
 
-const ARROWS: Record<string, "ArrowDown" | "ArrowUp" | "Home" | "End"> = {
-  ArrowRight: "ArrowDown",
-  ArrowDown: "ArrowDown",
-  ArrowLeft: "ArrowUp",
-  ArrowUp: "ArrowUp",
-  Home: "Home",
-  End: "End",
-};
+const arrowKey = compile<string, NavKey | null>([
+  { with: "ArrowRight", then: "ArrowDown" },
+  { with: "ArrowDown", then: "ArrowDown" },
+  { with: "ArrowLeft", then: "ArrowUp" },
+  { with: "ArrowUp", then: "ArrowUp" },
+  { with: "Home", then: "Home" },
+  { with: "End", then: "End" },
+  { otherwise: null },
+]);
 
 export function SegmentedControl<V extends string>({
   label,
@@ -61,7 +63,7 @@ export function SegmentedControl<V extends string>({
   const tabbable = selected >= 0 && !options[selected]?.disabled ? selected : firstEnabled;
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    const key = ARROWS[event.key];
+    const key = arrowKey(event.key);
     if (!key) return;
     event.preventDefault();
     const active = nodes.current.indexOf(document.activeElement as HTMLButtonElement);
@@ -82,7 +84,15 @@ export function SegmentedControl<V extends string>({
     <div
       role="radiogroup"
       aria-label={label}
-      className={classigo("seg", `seg--${variant}`, className)}
+      className={classigo(
+        "seg",
+        {
+          "seg--default": variant === "default",
+          "seg--status": variant === "status",
+          "seg--mini": variant === "mini",
+        },
+        className,
+      )}
       style={style}
       onKeyDown={onKeyDown}
     >

@@ -1,4 +1,5 @@
 import { type ChildProcess, spawn } from "node:child_process";
+import { compile } from "matchigo";
 
 export interface ExecResult {
   stdout: string;
@@ -6,15 +7,16 @@ export interface ExecResult {
   exitCode: number;
 }
 
-const INSTALL_HINT: Record<string, string> = {
-  win32: "winget install Gyan.FFmpeg",
-  darwin: "brew install ffmpeg",
-};
+const installHint = compile<string, string>([
+  { with: "win32", then: "winget install Gyan.FFmpeg" },
+  { with: "darwin", then: "brew install ffmpeg" },
+  { otherwise: "sudo apt install ffmpeg" },
+]);
 
 export function missingToolError(tool: string, error: Error): Error {
   const code = (error as NodeJS.ErrnoException).code;
   if (code !== "ENOENT") return new Error(`Cannot run ${tool}: ${error.message}`);
-  const install = INSTALL_HINT[process.platform] ?? "sudo apt install ffmpeg";
+  const install = installHint(process.platform);
   return new Error(
     `Cannot run ${tool}: is it installed and on PATH? Install ffmpeg (which includes ffprobe), for example: ${install}`,
   );

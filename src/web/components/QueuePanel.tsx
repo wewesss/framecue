@@ -6,7 +6,7 @@ import { shortTimecode } from "../format";
 import { itemTimecode } from "../frame";
 import { Rich, useI18n } from "../i18n";
 import { mapFilteredToFull } from "../sortable";
-import { kindIcon, STATUSES, statusIcon, statusLabelKey } from "../status";
+import { kindIcon, STATUSES, statusClass, statusIcon, statusLabelKey } from "../status";
 import { Button, IconButton } from "../ui/Button";
 import { Icon } from "../ui/Icon";
 import { Menu, type MenuEntry } from "../ui/Menu";
@@ -88,7 +88,7 @@ export function QueuePanel({
     },
     ...STATUSES.map<SegmentOption<Filter>>((status) => ({
       value: status,
-      className: `s-${status}`,
+      className: statusClass(status),
       label: t(statusLabelKey(status)),
       tip: t(statusLabelKey(status)),
       content: (

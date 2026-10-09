@@ -1,4 +1,4 @@
-import classigo from "classigo";
+import classigo from "classigo/lite";
 import type { ComponentProps, ReactNode } from "react";
 
 interface FieldProps {

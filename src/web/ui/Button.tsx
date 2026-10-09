@@ -34,7 +34,15 @@ export function Button({
     <button
       {...rest}
       type={type}
-      className={classigo("btn", `btn--${variant}`, className)}
+      className={classigo(
+        "btn",
+        {
+          "btn--gray": variant === "gray",
+          "btn--primary": variant === "primary",
+          "btn--plain": variant === "plain",
+        },
+        className,
+      )}
       aria-disabled={disabled || undefined}
       onClick={guard(disabled, onClick)}
     >
@@ -74,8 +82,11 @@ export function IconButton({
       {...rest}
       type="button"
       className={classigo(
-        variant === "play" ? "play" : "icon-btn",
-        variant === "default" && size === "sm" && "icon-btn--sm",
+        {
+          play: variant === "play",
+          "icon-btn": variant !== "play",
+          "icon-btn--sm": variant === "default" && size === "sm",
+        },
         className,
       )}
       aria-label={label}

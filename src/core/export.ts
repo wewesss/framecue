@@ -1,4 +1,5 @@
 import { resolve } from "node:path";
+import { compile } from "matchigo";
 import type { Item } from "./types";
 
 export interface ExportContext {
@@ -27,28 +28,28 @@ function abs(ctx: ExportContext, rel: string): string {
   return resolve(ctx.workspace, rel);
 }
 
-function imageLabel(item: Item, name: string): string {
-  const middle = Math.floor((item.frameStart + item.frameEnd) / 2);
-  switch (name) {
-    case "frame.png":
-      return `frame ${item.frameStart}`;
-    case "first.png":
-      return `in, frame ${item.frameStart}`;
-    case "middle.png":
-      return `middle, frame ${middle}`;
-    case "last.png":
-      return `out, frame ${item.frameEnd}`;
-    case "sheet.png":
-      return "contact sheet";
-    default:
-      return name;
-  }
+interface ImageRef {
+  item: Item;
+  name: string;
 }
+
+const imageLabel = compile<ImageRef, string>([
+  { with: { name: "frame.png" }, then: ({ item }: ImageRef) => `frame ${item.frameStart}` },
+  { with: { name: "first.png" }, then: ({ item }: ImageRef) => `in, frame ${item.frameStart}` },
+  {
+    with: { name: "middle.png" },
+    then: ({ item }: ImageRef) =>
+      `middle, frame ${Math.floor((item.frameStart + item.frameEnd) / 2)}`,
+  },
+  { with: { name: "last.png" }, then: ({ item }: ImageRef) => `out, frame ${item.frameEnd}` },
+  { with: { name: "sheet.png" }, then: "contact sheet" },
+  { otherwise: ({ name }) => name },
+]);
 
 function imageLines(ctx: ExportContext, item: Item, images: string[]): string[] {
   return images.map((image) => {
     const name = image.split("/").pop() ?? image;
-    return `- ${imageLabel(item, name)}: ${abs(ctx, image)}`;
+    return `- ${imageLabel({ item, name })}: ${abs(ctx, image)}`;
   });
 }
 

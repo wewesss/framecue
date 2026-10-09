@@ -1,3 +1,4 @@
+import classigo from "classigo";
 import { useEffect, useRef } from "react";
 import { useT } from "../i18n";
 import { Button, IconButton } from "../ui/Button";
@@ -50,7 +51,7 @@ export function Toast({ data, onSee, onDismiss }: ToastProps) {
       <Icon
         name={sticky ? "exclamationmark.triangle" : "film"}
         size={16}
-        className={sticky ? "toast__icon toast__icon--warn" : "toast__icon"}
+        className={classigo("toast__icon", { "toast__icon--warn": sticky })}
       />
       <div className="toast__text">
         <span>

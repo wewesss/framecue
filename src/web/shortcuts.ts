@@ -1,4 +1,4 @@
-import { matcher, P } from "matchigo";
+import { compile, P } from "matchigo";
 
 export type Action =
   | "toggle"
@@ -29,30 +29,31 @@ export interface KeyInput {
   mod: boolean;
 }
 
-const resolve = matcher<KeyInput, Action | null>()
-  .with({ mod: true }, () => null)
-  .with({ alt: true }, () => null)
-  .with({ key: "C", shift: true }, () => "copy")
-  .with({ key: " " }, () => "toggle")
-  .with({ key: "ArrowLeft", shift: true }, () => "back10")
-  .with({ key: "ArrowRight", shift: true }, () => "forward10")
-  .with({ key: "," }, () => "prev")
-  .with({ key: "." }, () => "next")
-  .with({ key: "Home" }, () => "first")
-  .with({ key: "End" }, () => "last")
-  .with({ key: P.union("i", "I") }, () => "setIn")
-  .with({ key: P.union("o", "O") }, () => "setOut")
-  .with({ key: P.union("r", "R") }, () => "region")
-  .with({ key: "Enter" }, () => "add")
-  .with({ key: "Escape" }, () => "clear")
-  .with({ key: "?" }, () => "help")
-  .with({ key: P.union("+", "=") }, () => "zoomIn")
-  .with({ key: P.union("-", "_") }, () => "zoomOut")
-  .with({ key: P.union("z", "Z"), shift: true }, () => "fit")
-  .with({ key: P.union("s", "S") }, () => "snap")
-  .with({ key: P.union("v", "V") }, () => "verify")
-  .with({ key: P.union("x", "X") }, () => "reopen")
-  .otherwise(() => null);
+const resolve = compile<KeyInput, Action | null>([
+  { with: { mod: true }, then: null },
+  { with: { alt: true }, then: null },
+  { with: { key: "C", shift: true }, then: "copy" },
+  { with: { key: " " }, then: "toggle" },
+  { with: { key: "ArrowLeft", shift: true }, then: "back10" },
+  { with: { key: "ArrowRight", shift: true }, then: "forward10" },
+  { with: { key: "," }, then: "prev" },
+  { with: { key: "." }, then: "next" },
+  { with: { key: "Home" }, then: "first" },
+  { with: { key: "End" }, then: "last" },
+  { with: { key: P.union("i", "I") }, then: "setIn" },
+  { with: { key: P.union("o", "O") }, then: "setOut" },
+  { with: { key: P.union("r", "R") }, then: "region" },
+  { with: { key: "Enter" }, then: "add" },
+  { with: { key: "Escape" }, then: "clear" },
+  { with: { key: "?" }, then: "help" },
+  { with: { key: P.union("+", "=") }, then: "zoomIn" },
+  { with: { key: P.union("-", "_") }, then: "zoomOut" },
+  { with: { key: P.union("z", "Z"), shift: true }, then: "fit" },
+  { with: { key: P.union("s", "S") }, then: "snap" },
+  { with: { key: P.union("v", "V") }, then: "verify" },
+  { with: { key: P.union("x", "X") }, then: "reopen" },
+  { otherwise: null },
+]);
 
 export function shortcutAction(input: KeyInput): Action | null {
   return resolve(input);

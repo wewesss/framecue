@@ -1,4 +1,4 @@
-import classigo from "classigo";
+import classigo from "classigo/lite";
 import {
   type KeyboardEvent,
   type ReactNode,

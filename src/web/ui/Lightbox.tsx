@@ -1,3 +1,4 @@
+import classigo from "classigo";
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { IconButton } from "./Button";
@@ -49,7 +50,9 @@ export function Lightbox({ src, compare, alt, title, closeLabel, onClose }: Ligh
         onClick={onClose}
       />
       <figure
-        className={compare ? "lightbox__figure lightbox__figure--compare" : "lightbox__figure"}
+        className={classigo("lightbox__figure", {
+          "lightbox__figure--compare": compare !== undefined,
+        })}
       >
         {compare ? (
           <CompareView before={compare.before} after={compare.after} labels={compare.labels} />

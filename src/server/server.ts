@@ -3,7 +3,7 @@ import { readFile, stat } from "node:fs/promises";
 import type { Server } from "node:http";
 import { dirname, extname, join, normalize, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { matcher, P } from "matchigo";
+import { compile, P } from "matchigo";
 import {
   attachAfter,
   clearAfter,
@@ -56,34 +56,38 @@ const QUEUE_DEBOUNCE_MS = 150;
 const KINDS: ItemKind[] = ["frame", "range", "region"];
 const STATUSES: ItemStatus[] = ["todo", "fixed", "verified", "reopened"];
 
-const MIME: Record<string, string> = {
-  ".mp4": "video/mp4",
-  ".m4v": "video/mp4",
-  ".webm": "video/webm",
-  ".mov": "video/quicktime",
-  ".mkv": "video/x-matroska",
-};
+const OCTET_STREAM = "application/octet-stream";
 
-const STATIC_MIME: Record<string, string> = {
-  ".html": "text/html; charset=utf-8",
-  ".js": "text/javascript; charset=utf-8",
-  ".mjs": "text/javascript; charset=utf-8",
-  ".css": "text/css; charset=utf-8",
-  ".json": "application/json; charset=utf-8",
-  ".map": "application/json; charset=utf-8",
-  ".svg": "image/svg+xml",
-  ".png": "image/png",
-  ".jpg": "image/jpeg",
-  ".jpeg": "image/jpeg",
-  ".webp": "image/webp",
-  ".gif": "image/gif",
-  ".ico": "image/x-icon",
-  ".woff": "font/woff",
-  ".woff2": "font/woff2",
-  ".ttf": "font/ttf",
-  ".txt": "text/plain; charset=utf-8",
-  ".webmanifest": "application/manifest+json; charset=utf-8",
-};
+const videoMime = compile<string, string>([
+  { with: ".mp4", then: "video/mp4" },
+  { with: ".m4v", then: "video/mp4" },
+  { with: ".webm", then: "video/webm" },
+  { with: ".mov", then: "video/quicktime" },
+  { with: ".mkv", then: "video/x-matroska" },
+  { otherwise: OCTET_STREAM },
+]);
+
+const staticMime = compile<string, string>([
+  { with: ".html", then: "text/html; charset=utf-8" },
+  { with: ".js", then: "text/javascript; charset=utf-8" },
+  { with: ".mjs", then: "text/javascript; charset=utf-8" },
+  { with: ".css", then: "text/css; charset=utf-8" },
+  { with: ".json", then: "application/json; charset=utf-8" },
+  { with: ".map", then: "application/json; charset=utf-8" },
+  { with: ".svg", then: "image/svg+xml" },
+  { with: ".png", then: "image/png" },
+  { with: ".jpg", then: "image/jpeg" },
+  { with: ".jpeg", then: "image/jpeg" },
+  { with: ".webp", then: "image/webp" },
+  { with: ".gif", then: "image/gif" },
+  { with: ".ico", then: "image/x-icon" },
+  { with: ".woff", then: "font/woff" },
+  { with: ".woff2", then: "font/woff2" },
+  { with: ".ttf", then: "font/ttf" },
+  { with: ".txt", then: "text/plain; charset=utf-8" },
+  { with: ".webmanifest", then: "application/manifest+json; charset=utf-8" },
+  { otherwise: OCTET_STREAM },
+]);
 
 async function fileSize(path: string): Promise<number | null> {
   try {
@@ -154,16 +158,33 @@ function fail(status: number, message: string): never {
   throw new HttpError(status, message);
 }
 
+interface Failure {
+  error: unknown;
+  message: string;
+}
+
+const errorStatus = compile<Failure, number>([
+  {
+    with: { error: P.instanceOf(HttpError) },
+    then: ({ error }: Failure) => (error as HttpError).status,
+  },
+  { with: { error: P.instanceOf(FrameOutOfRangeError) }, then: 409 },
+  { with: { message: P.startsWithStr("Item not found") }, then: 404 },
+  { with: { message: P.startsWithStr("Invalid status transition") }, then: 409 },
+  {
+    with: {
+      message: P.when(
+        (m) => typeof m === "string" && BAD_REQUEST_PREFIXES.some((p) => m.startsWith(p)),
+      ),
+    },
+    then: 400,
+  },
+  { otherwise: 500 },
+]);
+
 function errorResponse(error: unknown): Response {
-  if (error instanceof HttpError) return json({ error: error.message }, error.status);
   const message = error instanceof Error ? error.message : String(error);
-  if (error instanceof FrameOutOfRangeError) return json({ error: message }, 409);
-  if (message.startsWith("Item not found")) return json({ error: message }, 404);
-  if (message.startsWith("Invalid status transition")) return json({ error: message }, 409);
-  if (BAD_REQUEST_PREFIXES.some((p) => message.startsWith(p))) {
-    return json({ error: message }, 400);
-  }
-  return json({ error: message }, 500);
+  return json({ error: message }, errorStatus({ error, message }));
 }
 
 async function readBody(request: Request): Promise<Record<string, unknown>> {
@@ -242,7 +263,7 @@ function videoInfo(c: Ctx): Response {
 async function streamVideo({ request, info }: Ctx): Promise<Response> {
   const size = await fileSize(info.path);
   if (size === null) fail(404, "Video not found");
-  const type = MIME[extname(info.path).toLowerCase()] ?? "application/octet-stream";
+  const type = videoMime(extname(info.path).toLowerCase());
   const base = { "Content-Type": type, "Accept-Ranges": "bytes", "Cache-Control": "no-cache" };
   const rangeHeader = request.headers.get("range");
   if (rangeHeader === null) {
@@ -390,33 +411,43 @@ async function serveFrame({ parts, workspace }: Ctx): Promise<Response> {
   });
 }
 
-const dispatch = matcher<Ctx, Response | Promise<Response>>()
-  .with({ method: "GET", parts: P.tuple("api", "health") }, () => json({ ok: true }))
-  .with({ method: "GET", parts: P.tuple("api", "video") }, videoInfo)
-  .with({ method: "GET", parts: P.tuple("api", "video", "stream") }, streamVideo)
-  .with({ method: "GET", parts: P.tuple("api", "audio", "peaks") }, serveAudioPeaks)
-  .with({ method: "GET", parts: P.tuple("api", "items") }, listItems)
-  .with({ method: "GET", parts: P.tuple("api", "export") }, exportQueue)
-  .with({ method: "POST", parts: P.tuple("api", "items") }, postItem)
-  .with({ method: "POST", parts: P.tuple("api", "items", "reorder") }, reorderItems)
-  .with({ method: "PATCH", parts: P.tuple("api", "items", P.string) }, patchItem)
-  .with({ method: "POST", parts: P.tuple("api", "items", P.string, "after") }, recaptureAfter)
-  .with({ method: "DELETE", parts: P.tuple("api", "items", P.string) }, removeItem)
-  .with({ method: "GET", parts: P.tuple("api", "events") }, openEvents)
-  .with({ method: "GET", parts: P.tuple("api", "frames", P.string, P.string) }, serveFrame)
-  .with(
-    { method: "GET", parts: P.tuple("api", "frames", P.string, P.string, P.string) },
-    serveFrame,
-  )
-  .with({ parts: P.when((p) => Array.isArray(p) && p[0] === "api") }, () => fail(404, "Not found"))
-  .otherwise(serveStatic);
+const dispatch = compile<Ctx, Response | Promise<Response>>([
+  { with: { method: "GET", parts: P.tuple("api", "health") }, then: () => json({ ok: true }) },
+  { with: { method: "GET", parts: P.tuple("api", "video") }, then: videoInfo },
+  { with: { method: "GET", parts: P.tuple("api", "video", "stream") }, then: streamVideo },
+  { with: { method: "GET", parts: P.tuple("api", "audio", "peaks") }, then: serveAudioPeaks },
+  { with: { method: "GET", parts: P.tuple("api", "items") }, then: listItems },
+  { with: { method: "GET", parts: P.tuple("api", "export") }, then: exportQueue },
+  { with: { method: "POST", parts: P.tuple("api", "items") }, then: postItem },
+  { with: { method: "POST", parts: P.tuple("api", "items", "reorder") }, then: reorderItems },
+  { with: { method: "PATCH", parts: P.tuple("api", "items", P.string) }, then: patchItem },
+  {
+    with: { method: "POST", parts: P.tuple("api", "items", P.string, "after") },
+    then: recaptureAfter,
+  },
+  { with: { method: "DELETE", parts: P.tuple("api", "items", P.string) }, then: removeItem },
+  { with: { method: "GET", parts: P.tuple("api", "events") }, then: openEvents },
+  {
+    with: { method: "GET", parts: P.tuple("api", "frames", P.string, P.string) },
+    then: serveFrame,
+  },
+  {
+    with: { method: "GET", parts: P.tuple("api", "frames", P.string, P.string, P.string) },
+    then: serveFrame,
+  },
+  {
+    with: { parts: P.when((p) => Array.isArray(p) && p[0] === "api") },
+    then: () => fail(404, "Not found"),
+  },
+  { otherwise: serveStatic },
+]);
 
 async function staticFile(path: string): Promise<Response | null> {
   const size = await fileSize(path);
   if (size === null) return null;
   return new Response(fileBody(path), {
     headers: {
-      "Content-Type": STATIC_MIME[extname(path).toLowerCase()] ?? "application/octet-stream",
+      "Content-Type": staticMime(extname(path).toLowerCase()),
       "Content-Length": String(size),
     },
   });

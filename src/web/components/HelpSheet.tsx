@@ -1,7 +1,7 @@
 import classigo from "classigo";
 import { Fragment, type ReactNode, useEffect, useRef } from "react";
 import { Rich, type TKey, useT } from "../i18n";
-import { STATUSES, statusDescKey, statusIcon, statusLabelKey } from "../status";
+import { STATUSES, statusClass, statusDescKey, statusIcon, statusLabelKey } from "../status";
 import { IconButton } from "../ui/Button";
 import { Icon, type IconName } from "../ui/Icon";
 import { Kbd } from "../ui/Kbd";
@@ -306,7 +306,7 @@ export function HelpSheet({ open, onClose }: HelpSheetProps) {
           <div className="stlist">
             {STATUSES.map((status) => (
               <div key={status}>
-                <span className={`status-pill s-${status}`}>
+                <span className={classigo("status-pill", statusClass(status))}>
                   <Icon name={statusIcon(status)} size={12} />
                   {t(statusLabelKey(status))}
                 </span>

@@ -1,4 +1,5 @@
 import classigo from "classigo";
+import { matcher } from "matchigo";
 import { type PointerEvent, useRef, useState } from "react";
 import type { Region } from "../../core/types";
 import { clamp } from "../frame";
@@ -25,6 +26,17 @@ type Gesture =
   | { kind: "draw"; origin: { x: number; y: number } }
   | { kind: "move"; origin: { x: number; y: number }; start: Region }
   | { kind: "resize"; origin: { x: number; y: number }; start: Region; handle: Handle };
+
+const handleClass = matcher<Handle, string>()
+  .with("nw", "region__h--nw")
+  .with("n", "region__h--n")
+  .with("ne", "region__h--ne")
+  .with("e", "region__h--e")
+  .with("se", "region__h--se")
+  .with("s", "region__h--s")
+  .with("sw", "region__h--sw")
+  .with("w", "region__h--w")
+  .exhaustive();
 
 export function RegionOverlay({ video, region, active, onCommit }: RegionOverlayProps) {
   const t = useT();
@@ -100,7 +112,11 @@ export function RegionOverlay({ video, region, active, onCommit }: RegionOverlay
             {t("region.label", { w: size.w, h: size.h })}
           </span>
           {HANDLES.map((handle) => (
-            <i key={handle} data-handle={handle} className={`region__h region__h--${handle}`} />
+            <i
+              key={handle}
+              data-handle={handle}
+              className={classigo("region__h", handleClass(handle))}
+            />
           ))}
         </div>
       )}

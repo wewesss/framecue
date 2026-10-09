@@ -1,6 +1,7 @@
+import { matcher } from "matchigo";
 import type { Item } from "../../core/types";
-import { useI18n } from "../i18n";
-import { divLabel, rulerSteps } from "../timeline/ticks";
+import { type TKey, useI18n } from "../i18n";
+import { type DivLabel, divLabel, rulerSteps } from "../timeline/ticks";
 import type { TimelineView } from "../timeline/useTimelineView";
 import { atMaxZoom, formatFactor, isFit, ZOOM_STEP, zoomFactor } from "../timeline/zoom";
 import { Button, IconButton } from "../ui/Button";
@@ -8,6 +9,12 @@ import { Icon } from "../ui/Icon";
 import { Switch } from "../ui/Switch";
 import { Tooltip } from "../ui/Tooltip";
 import { Overview } from "./Overview";
+
+const divKey = matcher<DivLabel["unit"], TKey>()
+  .with("frames", "timeline.divFrames")
+  .with("seconds", "timeline.divSeconds")
+  .with("minutes", "timeline.divMinutes")
+  .exhaustive();
 
 function titled(label: string, text: string) {
   return (
@@ -51,14 +58,7 @@ export function ToolsRow({
   const k = zoomFactor(view, count);
   const steps = rulerSteps(width / (view.v1 - view.v0), fps);
   const div = divLabel(steps.label, fps);
-  const divText = t(
-    div.unit === "frames"
-      ? "timeline.divFrames"
-      : div.unit === "seconds"
-        ? "timeline.divSeconds"
-        : "timeline.divMinutes",
-    { n: div.value },
-  );
+  const divText = t(divKey(div.unit), { n: div.value });
   const decimal = lang === "fr" ? "," : ".";
   const around = frame + 0.5;
 

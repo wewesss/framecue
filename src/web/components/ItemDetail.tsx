@@ -9,6 +9,7 @@ import {
   kindIcon,
   kindLabelKey,
   STATUSES,
+  statusClass,
   statusDescKey,
   statusIcon,
   statusLabelKey,
@@ -155,7 +156,7 @@ function ItemForm({
 
   const statusOptions: SegmentOption<ItemStatus>[] = STATUSES.map((status) => ({
     value: status,
-    className: `s-${status}`,
+    className: statusClass(status),
     tip: t(statusDescKey(status)),
     content: (
       <>

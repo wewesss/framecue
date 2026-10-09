@@ -12,6 +12,7 @@ import type { VideoResponse } from "../api";
 import { channelsKey, fileName } from "../format";
 import { clamp, formatTimecode } from "../frame";
 import { useI18n } from "../i18n";
+import { markerStatusClass } from "../status";
 import type { Theme } from "../theme";
 import { drawGrid, drawWave } from "../timeline/canvas";
 import {
@@ -440,16 +441,13 @@ export function Timeline({
                   tabIndex={-1}
                   aria-label={tip}
                   data-marker={item.id}
-                  className={classigo(
-                    "mk",
-                    `mk--${item.status}`,
-                    isRange ? "mk--bar" : "mk--tick",
-                    {
-                      "mk--region": item.kind === "region",
-                      "mk--selected": selected,
-                      "mk--dim": filter !== "all" && item.status !== filter,
-                    },
-                  )}
+                  className={classigo("mk", markerStatusClass(item.status), {
+                    "mk--bar": isRange,
+                    "mk--tick": !isRange,
+                    "mk--region": item.kind === "region",
+                    "mk--selected": selected,
+                    "mk--dim": filter !== "all" && item.status !== filter,
+                  })}
                   style={{ left: x0, width: isRange ? w : undefined }}
                   onClick={() => onSelectItem(item)}
                 />

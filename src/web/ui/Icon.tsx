@@ -43,6 +43,7 @@ import {
   xmark,
 } from "@miralabs-tech/icones";
 import { symbolTree } from "@miralabs-tech/icones/render";
+import classigo from "classigo/lite";
 import { createElement, type ReactElement } from "react";
 
 const registry = {
@@ -146,7 +147,7 @@ export function Icon({ name, size = 16, filled = false, rotate = 0, className }:
   const root = toElement(treeFor(name, filled, rotate));
   return createElement(root.type as string, {
     ...(root.props as object),
-    className: className ? `ic ${className}` : "ic",
+    className: classigo("ic", className),
     style: { inlineSize: size, blockSize: size },
   });
 }

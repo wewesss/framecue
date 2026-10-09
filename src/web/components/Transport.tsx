@@ -1,3 +1,4 @@
+import classigo from "classigo";
 import { type KeyboardEvent, useState } from "react";
 import { formatTimecode } from "../frame";
 import { useT } from "../i18n";
@@ -144,7 +145,7 @@ export function Transport({
                 name="arrow.down.to.line"
                 size={16}
                 rotate={90}
-                className={selection.in !== null ? "sel__set" : undefined}
+                className={classigo({ sel__set: selection.in !== null })}
               />
               <span className="num">{selection.in ?? "—"}</span>
             </Button>
@@ -155,7 +156,7 @@ export function Transport({
                 name="arrow.down.to.line"
                 size={16}
                 rotate={-90}
-                className={selection.out !== null ? "sel__set" : undefined}
+                className={classigo({ sel__set: selection.out !== null })}
               />
               <span className="num">{selection.out ?? "—"}</span>
             </Button>
