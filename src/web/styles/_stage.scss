@@ -1,0 +1,193 @@
+@use "mixins";
+
+.stage {
+  position: relative;
+  flex: 1;
+  min-height: 220px;
+  overflow: hidden;
+  background: var(--stage);
+  touch-action: none;
+
+  &:focus-visible {
+    outline-offset: -3px;
+  }
+
+  &--loading {
+    display: grid;
+    place-items: center;
+    color: var(--text-muted);
+  }
+
+  &--movable {
+    cursor: grab;
+  }
+
+  &--panning {
+    cursor: grabbing;
+  }
+
+  &__picture {
+    position: absolute;
+    background: #000;
+    box-shadow: 0 2px 14px rgb(0 0 0 / 35%);
+  }
+
+  &__video {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: fill;
+  }
+
+  &__hud,
+  &__zoom {
+    position: absolute;
+    top: 10px;
+    opacity: 0;
+    transition: opacity 0.15s var(--fc-ease-out);
+  }
+
+  &__hud {
+    left: 12px;
+    pointer-events: none;
+  }
+
+  &__zoom {
+    right: 12px;
+  }
+
+  &:hover &__hud,
+  &:hover &__zoom,
+  &:focus-within &__hud,
+  &:focus-within &__zoom {
+    opacity: 1;
+  }
+
+  &__chip {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: var(--fc-radius-full);
+    background: color-mix(in srgb, var(--surface) 80%, transparent);
+    color: var(--text-muted);
+    font-size: 11px;
+  }
+
+  &__zoom .seg {
+    background: color-mix(in srgb, var(--surface) 80%, transparent);
+  }
+}
+
+.region-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+
+  &--active {
+    cursor: crosshair;
+    pointer-events: auto;
+    touch-action: none;
+  }
+}
+
+.region {
+  position: absolute;
+  border: 1.5px solid var(--accent);
+  box-shadow:
+    0 0 0 1px var(--region-outline),
+    inset 0 0 0 1px var(--region-outline);
+  pointer-events: none;
+
+  .region-overlay--active & {
+    cursor: move;
+    pointer-events: auto;
+  }
+
+  &__label {
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: -1.5px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 8px;
+    border-radius: var(--fc-radius-full);
+    background: var(--accent);
+    box-shadow: 0 0 0 1px var(--region-outline);
+    color: #052a31;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.3;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+
+  &__h {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    background: var(--accent);
+    box-shadow: 0 0 0 1px var(--region-outline);
+
+    &--nw {
+      top: -5px;
+      left: -5px;
+      cursor: nwse-resize;
+    }
+
+    &--n {
+      top: -5px;
+      left: calc(50% - 4px);
+      cursor: ns-resize;
+    }
+
+    &--ne {
+      top: -5px;
+      right: -5px;
+      cursor: nesw-resize;
+    }
+
+    &--e {
+      top: calc(50% - 4px);
+      right: -5px;
+      cursor: ew-resize;
+    }
+
+    &--se {
+      right: -5px;
+      bottom: -5px;
+      cursor: nwse-resize;
+    }
+
+    &--s {
+      bottom: -5px;
+      left: calc(50% - 4px);
+      cursor: ns-resize;
+    }
+
+    &--sw {
+      bottom: -5px;
+      left: -5px;
+      cursor: nesw-resize;
+    }
+
+    &--w {
+      top: calc(50% - 4px);
+      left: -5px;
+      cursor: ew-resize;
+    }
+  }
+}
+
+[data-theme="light"] .stage__chip {
+  color: #333;
+}
+
+@media (max-width: 899px) {
+  .stage {
+    flex: none;
+    height: calc(100vw * 9 / 16 + 56px);
+    min-height: 0;
+  }
+}

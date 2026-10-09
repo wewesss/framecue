@@ -1,0 +1,110 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font: 13px/1.4 var(--font);
+  letter-spacing: -0.006em;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+textarea,
+select {
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+:focus {
+  outline: none;
+}
+
+:focus-visible {
+  outline: 3px solid var(--fc-focus-ring);
+  outline-offset: 2px;
+}
+
+.ic {
+  display: block;
+  flex: none;
+}
+
+.num {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.spacer {
+  flex: 1;
+}
+
+kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border: 0;
+  border-radius: 5px;
+  background: var(--fc-fill-2);
+  box-shadow: inset 0 -1px 0 var(--fc-fill-2);
+  color: var(--text);
+  font: 500 11px/1 var(--mono);
+  white-space: nowrap;
+}
+
+code {
+  padding: 0 4px;
+  border-radius: var(--fc-radius-2xs);
+  background: var(--fc-fill-2);
+  font: 11.5px var(--mono);
+}
+
+html.preload *,
+html.preload *::before {
+  transition: none !important;
+}
+
+@media (max-width: 899px) {
+  body {
+    overflow: auto;
+  }
+}

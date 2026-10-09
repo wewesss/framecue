@@ -5,9 +5,10 @@
     "": {
       "name": "framecue",
       "dependencies": {
+        "@miralabs-tech/icones": "^0.3.0",
         "@standarx/nav": "^0.3.0",
         "classigo": "^2.0.0",
-        "matchigo": "^1.0.2",
+        "matchigo": "^1.0.3",
         "react": "^19.3.0",
         "react-dom": "^19.3.0",
       },
@@ -41,6 +42,8 @@
     "@biomejs/cli-win32-arm64": ["@biomejs/cli-win32-arm64@2.5.15", "", { "os": "win32", "cpu": "arm64" }, "sha512-2kPKzhNlm8C+Ru3GcO0Me2ODkCBLrVOUNuyi84RJyWDVKAA4+Kjj3jMjL938lF6BRfvltC4vB2nPY9SvN51Ovg=="],
 
     "@biomejs/cli-win32-x64": ["@biomejs/cli-win32-x64@2.5.15", "", { "os": "win32", "cpu": "x64" }, "sha512-yAzh4UqEImV6Hcy0zjUqNfJAsUhoD64FBQCdTG8Md/Z2wQeVP/ZmJ3XRYAs1g8J9fjTFyl2fCtc5FB5til47+g=="],
+
+    "@miralabs-tech/icones": ["@miralabs-tech/icones@0.3.0", "", {}, "sha512-MqqnC3xEpBC3FSnrNxW/LmiC/l4+6cwhQgyuHfowTrZf9wdMzxDkA0NJBK/nW/TyNhBl02Uypg1g7baazVE9Bw=="],
 
     "@oxc-project/types": ["@oxc-project/types@0.153.0", "", {}, "sha512-jSNrRIyvPVLL5E1z/tS5zLAprosGz/FuI1PWwEOz59j3E4TTTzSpqKb/RDGqJhhW0QHYISGXxq582wGx6T11Tw=="],
 
@@ -198,7 +201,7 @@
 
     "lightningcss-win32-x64-msvc": ["lightningcss-win32-x64-msvc@1.33.0", "", { "os": "win32", "cpu": "x64" }, "sha512-OlEICDx/Xl0FqSp4bry8zFnCvGpig3Gl4gCquvYwHuqJKEC1+n9NgDniFvqHGmMv1ZkqDJrDqKKSykTDX+ehuA=="],
 
-    "matchigo": ["matchigo@1.0.2", "", { "peerDependencies": { "typescript": ">=5.4" }, "optionalPeers": ["typescript"] }, "sha512-gfIwc38eLIbmRdTPgOCQ2++NCnGL9E4O1zWYlzymRDFYxguPRVqS3KH7AkXh9MYislreqKTkUPFpB57mGVc1og=="],
+    "matchigo": ["matchigo@1.0.3", "", { "peerDependencies": { "typescript": ">=5.4" }, "optionalPeers": ["typescript"] }, "sha512-czEJRzrNbAqKVUW+eYVryRK9V83YcC40BFzPW4fBD9UGZ7I4ZCOR9GUdRYW5HP9M9tBuOvMH+IzdIlg/Z22Qcg=="],
 
     "nanoid": ["nanoid@3.3.20", "", { "bin": { "nanoid": "bin/nanoid.cjs" } }, "sha512-uKdg2G3GNCKQn9byYOpxbGqrT2fGO5KRt5J/8b3pok8rT6qxGWF6hxMyJiEYtAf+FVyYuD9hRaDqX5uPFYJ4ZQ=="],
 

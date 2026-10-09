@@ -1,0 +1,43 @@
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  &__label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 18px;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 500;
+  }
+}
+
+.textarea {
+  width: 100%;
+  min-height: 64px;
+  padding: 8px 12px;
+  border: 1px solid var(--fc-field-border);
+  border-radius: var(--fc-radius-field);
+  background: var(--fc-field-bg);
+  color: var(--text);
+  line-height: 1.4;
+  resize: vertical;
+  transition: border-color 0.15s var(--fc-ease-out);
+
+  &:hover {
+    border-color: var(--border);
+  }
+
+  &::placeholder {
+    color: var(--text-faint);
+  }
+
+  &:focus-visible {
+    border-color: transparent;
+    outline: 3px solid var(--fc-focus-ring);
+    outline-offset: 0;
+  }
+}

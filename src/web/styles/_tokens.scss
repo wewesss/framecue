@@ -1,0 +1,221 @@
+@mixin dark {
+  color-scheme: dark;
+  --bg: #141414;
+  --surface: #1c1c1c;
+  --surface-2: #242424;
+  --surface-3: #2c2c2c;
+  --border: #2e2e2e;
+  --border-subtle: #232323;
+  --border-strong: #3a3a3a;
+  --stage: #181818;
+  --text: #e6e6e6;
+  --text-muted: #9a9a9a;
+  --text-faint: #5e5e5e;
+  --accent: #22d3ee;
+  --accent-soft: rgba(34, 211, 238, 0.14);
+  --accent-fill: #22d3ee;
+  --accent-fill-hover: #67e8f9;
+  --on-accent: #052a31;
+  --status-todo: #60a5fa;
+  --status-fixed: #fbbf24;
+  --status-verified: #4ade80;
+  --status-reopened: #f87171;
+  --region-outline: rgba(0, 0, 0, 0.75);
+  --wave: #5f5f5f;
+  --wave-rms: #a3a3a3;
+
+  --fc-glass-tint: rgba(30, 30, 30, 0.8);
+  --fc-glass-solid: #1f1f1f;
+  --fc-glass-spec-top: rgba(255, 255, 255, 0.22);
+  --fc-glass-spec-bottom: rgba(255, 255, 255, 0.06);
+  --fc-glass-rim-start: rgba(255, 255, 255, 0.28);
+  --fc-glass-rim-end: rgba(255, 255, 255, 0.04);
+  --fc-shadow-glass: 0 8px 32px -4px rgba(0, 0, 0, 0.55);
+  --fc-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --fc-shadow-segment: 0 2px 20px rgba(0, 0, 0, 0.24);
+  --fc-fill: rgba(255, 255, 255, 0.14);
+  --fc-fill-2: rgba(255, 255, 255, 0.1);
+  --fc-fill-3: rgba(255, 255, 255, 0.07);
+  --fc-fill-4: rgba(255, 255, 255, 0.045);
+  --fc-seg-selected: rgba(255, 255, 255, 0.22);
+  --fc-field-bg: #1e1e1e;
+  --fc-field-border: rgba(255, 255, 255, 0.06);
+  --fc-separator: rgba(255, 255, 255, 0.12);
+  --fc-scrim: rgba(0, 0, 0, 0.48);
+  --fc-switch-track: rgba(120, 120, 120, 0.32);
+}
+
+@mixin light {
+  color-scheme: light;
+  --bg: #f4f4f4;
+  --surface: #ffffff;
+  --surface-2: #ececec;
+  --surface-3: #e2e2e2;
+  --border: #d6d6d6;
+  --border-subtle: #e8e8e8;
+  --border-strong: #c4c4c4;
+  --stage: #bdbdbd;
+  --text: #1a1a1a;
+  --text-muted: #5c5c5c;
+  --text-faint: #a3a3a3;
+  --accent: #0891b2;
+  --accent-soft: rgba(8, 145, 178, 0.12);
+  --accent-fill: #0e7490;
+  --accent-fill-hover: #155e75;
+  --on-accent: #ffffff;
+  --status-todo: #2563eb;
+  --status-fixed: #b45309;
+  --status-verified: #15803d;
+  --status-reopened: #dc2626;
+  --region-outline: rgba(0, 0, 0, 0.75);
+  --wave: #b0b0b0;
+  --wave-rms: #5c5c5c;
+
+  --fc-glass-tint: rgba(250, 250, 250, 0.82);
+  --fc-glass-solid: #fbfbfb;
+  --fc-glass-spec-top: rgba(255, 255, 255, 0.5);
+  --fc-glass-spec-bottom: rgba(255, 255, 255, 0.12);
+  --fc-glass-rim-start: rgba(255, 255, 255, 0.55);
+  --fc-glass-rim-end: rgba(255, 255, 255, 0.1);
+  --fc-shadow-glass: 0 8px 32px -4px rgba(0, 0, 0, 0.14);
+  --fc-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.06), 0 1px 1px rgba(0, 0, 0, 0.04);
+  --fc-shadow-segment: 0 2px 20px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.08);
+  --fc-fill: rgba(0, 0, 0, 0.08);
+  --fc-fill-2: rgba(0, 0, 0, 0.06);
+  --fc-fill-3: rgba(0, 0, 0, 0.045);
+  --fc-fill-4: rgba(0, 0, 0, 0.03);
+  --fc-seg-selected: #ffffff;
+  --fc-field-bg: #ffffff;
+  --fc-field-border: rgba(0, 0, 0, 0.08);
+  --fc-separator: rgba(0, 0, 0, 0.1);
+  --fc-scrim: rgba(0, 0, 0, 0.2);
+  --fc-switch-track: rgba(120, 120, 120, 0.16);
+}
+
+:root {
+  @include dark;
+
+  --hover: var(--fc-fill-4);
+  --active: var(--fc-fill-3);
+
+  --fc-radius-2xs: 4px;
+  --fc-radius-xs: 6px;
+  --fc-radius-sm: 8px;
+  --fc-radius-md: 10px;
+  --fc-radius-lg: 14px;
+  --fc-radius-xl: 18px;
+  --fc-radius-2xl: 22px;
+  --fc-radius-full: 9999px;
+  --fc-radius-field: 12px;
+  --fc-radius-menu: 14px;
+  --fc-radius-menu-item: 8px;
+  --fc-radius-popover: 20px;
+  --fc-radius-tooltip: 6px;
+
+  --fc-control-h: 28px;
+  --fc-control-h-sm: 24px;
+  --fc-control-h-xs: 20px;
+
+  --fc-switch-w: 50px;
+  --fc-switch-h: 18px;
+  --fc-switch-knob-w: 30px;
+  --fc-switch-knob-h: 14px;
+  --fc-switch-knob-w-pressed: 47px;
+  --fc-switch-knob-h-pressed: 22px;
+  --fc-switch-label-gap: 10px;
+  --fc-thumb: #fff;
+  --fc-thumb-pressed-tint: rgba(255, 255, 255, 0.09);
+  --fc-thumb-pressed-shadow: 0 4px 4px rgba(0, 0, 0, 0.5);
+
+  --fc-press-scale: 0.97;
+  --fc-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --fc-spring-snappy: linear(
+    0,
+    0.0052 1.2%,
+    0.0233 2.6%,
+    0.0518 4%,
+    0.095 5.7%,
+    0.1382 7.1%,
+    0.1854 8.6%,
+    0.4131 15%,
+    0.5171 18.1%,
+    0.6109 21.2%,
+    0.6566 22.9%,
+    0.693 24.3%,
+    0.7267 25.7%,
+    0.7627 27.4%,
+    0.8206 30.5%,
+    0.8709 33.8%,
+    0.9125 37.4%,
+    0.9453 41.2%,
+    0.9708 45.5%,
+    0.9886 50.2%,
+    0.9999 55.7%,
+    1.0047 61%,
+    1.0063 67.6%,
+    1
+  );
+  --fc-spring-snappy-d: 0.42s;
+  --fc-spring-smooth: linear(
+    0,
+    0.0054 1.2%,
+    0.0201 2.3%,
+    0.0465 3.7%,
+    0.0803 5%,
+    0.1194 6.3%,
+    0.1621 7.7%,
+    0.3641 13.7%,
+    0.4626 16.7%,
+    0.5568 20%,
+    0.5969 21.5%,
+    0.6386 23.3%,
+    0.6728 24.8%,
+    0.708 26.5%,
+    0.74 28.3%,
+    0.769 30%,
+    0.8186 33.5%,
+    0.8623 37.3%,
+    0.9005 41.7%,
+    0.9306 46.5%,
+    0.9541 51.9%,
+    0.972 58.3%,
+    0.9839 65.2%,
+    0.9917 73.5%,
+    0.9962 83.1%,
+    1
+  );
+  --fc-spring-smooth-d: 0.52s;
+  --fc-glass-blur: 20px;
+  --fc-focus-ring: color-mix(in srgb, var(--accent) 90%, transparent);
+
+  --font:
+    -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --mono: ui-monospace, "JetBrains Mono", Consolas, monospace;
+  --fs-xs: 11px;
+  --fs-sm: 12px;
+  --fs-md: 13px;
+  --fs-lg: 15px;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    @include light;
+  }
+}
+
+:root[data-theme="dark"] {
+  @include dark;
+}
+
+:root[data-theme="light"] {
+  @include light;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --fc-spring-snappy: ease-out;
+    --fc-spring-smooth: ease-out;
+    --fc-spring-snappy-d: 0.01s;
+    --fc-spring-smooth-d: 0.01s;
+  }
+}

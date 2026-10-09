@@ -1,0 +1,95 @@
+@use "mixins";
+
+.app {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--panel-w, 360px);
+  grid-template-rows: 44px minmax(0, 1fr);
+  height: 100vh;
+  background: var(--bg);
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  container: main / inline-size;
+}
+
+.banner {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 12px;
+  background: var(--surface-2);
+  color: var(--status-reopened);
+}
+
+.panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  margin: 8px 8px 8px 0;
+  border-radius: var(--fc-radius-xl);
+
+  @include mixins.glass-solid;
+
+  > section {
+    position: relative;
+    z-index: 1;
+  }
+
+  &__resizer {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -6px;
+    z-index: 6;
+    width: 7px;
+    cursor: col-resize;
+    touch-action: none;
+
+    &::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 3px;
+      width: 1px;
+      background: transparent;
+      transition: background-color 0.15s var(--fc-ease-out);
+    }
+
+    &:hover::after,
+    &--drag::after {
+      background: var(--accent);
+    }
+  }
+}
+
+.empty {
+  padding: 24px 16px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+@media (max-width: 899px) {
+  .app {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 44px auto auto;
+    align-content: start;
+    height: auto;
+    min-height: 100vh;
+  }
+
+  .panel {
+    margin: 8px;
+
+    &__resizer {
+      display: none;
+    }
+  }
+}
