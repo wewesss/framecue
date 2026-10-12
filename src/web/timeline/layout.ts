@@ -4,6 +4,8 @@ export const RULER_H = 24;
 export const MARKERS_H = 22;
 export const CLIP_TOP = RULER_H + MARKERS_H;
 export const LANE_GAP = 3;
+export const LANE_PITCH = 18;
+export const MAX_VISIBLE_LANES = 4;
 export const BOTTOM_PAD = 5;
 export const MIN_HEIGHT = 64;
 export const MAX_HEIGHT_RATIO = 0.45;
@@ -16,6 +18,18 @@ export interface LaneOptions {
 export interface Lanes {
   clipH: number;
   audioH: number;
+}
+
+export function markersContentHeight(laneCount: number): number {
+  return MARKERS_H + (Math.max(laneCount, 1) - 1) * LANE_PITCH;
+}
+
+export function markersHeight(laneCount: number): number {
+  return markersContentHeight(Math.min(Math.max(laneCount, 1), MAX_VISIBLE_LANES));
+}
+
+export function laneOffset(lane: number, laneCount: number): number {
+  return (Math.max(laneCount, 1) - 1 - lane) * LANE_PITCH;
 }
 
 export function defaultHeight({ wave, audio }: LaneOptions): number {
