@@ -553,6 +553,7 @@ export function App() {
             onFilter={setFilter}
             onSelect={select}
             onReorder={reorder}
+            onDelete={remove}
             onCopy={(format, ids) => void copyForAgent(format, ids)}
           />
           <ItemDetail

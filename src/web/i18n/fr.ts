@@ -60,6 +60,8 @@ export const fr = {
   "queue.empty":
     "Repérez une image, une plage (<k>I</k> <k>O</k>) ou une zone (<k>R</k>), puis <k>{enter}</k>.",
   "queue.noComment": "sans commentaire",
+  "queue.delete": "Supprimer l'élément",
+  "queue.deleteConfirm": "Confirmer la suppression",
   "queue.grip": "Glisser pour changer la priorité",
   "queue.moved": "Élément déplacé en position {n} sur {total}",
   "queue.summary": "<n>{todo}</n> pour l'agent · <n>{fixed}</n> à vérifier",

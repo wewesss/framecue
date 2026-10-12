@@ -61,6 +61,8 @@ export const en: Record<TKey, string> = {
   "queue.empty":
     "Pick a frame, a range (<k>I</k> <k>O</k>) or a region (<k>R</k>), then <k>{enter}</k>.",
   "queue.noComment": "no comment",
+  "queue.delete": "Delete item",
+  "queue.deleteConfirm": "Confirm deletion",
   "queue.grip": "Drag to change priority",
   "queue.moved": "Item moved to position {n} of {total}",
   "queue.summary": "<n>{todo}</n> for the agent · <n>{fixed}</n> to verify",
