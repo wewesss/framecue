@@ -185,6 +185,9 @@ export const fr = {
   "transport.timecode": "Timecode",
   "transport.goTo": "Aller à l'image",
   "transport.frameNumber": "Numéro d'image",
+  "transport.mute": "Couper le son",
+  "transport.unmute": "Remettre le son",
+  "transport.volume": "Volume",
 
   "sel.in": "Point d'entrée sur l'image courante",
   "sel.out": "Point de sortie sur l'image courante",
@@ -214,6 +217,7 @@ export const fr = {
   "help.stepAnywhere": "depuis n'importe où",
   "help.step10": "10 images en arrière / en avant",
   "help.firstLast": "Première / dernière image",
+  "help.mute": "Couper / remettre le son",
   "help.inOut": "Point d'entrée / de sortie",
   "help.region": "Tracer une zone sur l'image",
   "help.regionNote":

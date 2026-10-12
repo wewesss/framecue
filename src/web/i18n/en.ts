@@ -184,6 +184,9 @@ export const en: Record<TKey, string> = {
   "transport.timecode": "Timecode",
   "transport.goTo": "Go to frame",
   "transport.frameNumber": "Frame number",
+  "transport.mute": "Mute",
+  "transport.unmute": "Unmute",
+  "transport.volume": "Volume",
 
   "sel.in": "Set In at the current frame",
   "sel.out": "Set Out at the current frame",
@@ -213,6 +216,7 @@ export const en: Record<TKey, string> = {
   "help.stepAnywhere": "from anywhere",
   "help.step10": "10 frames back / forward",
   "help.firstLast": "First / last frame",
+  "help.mute": "Mute / unmute",
   "help.inOut": "Set In / Out point",
   "help.region": "Draw a region on the picture",
   "help.regionNote": "then drag on the picture; handles resize, drag inside to move",

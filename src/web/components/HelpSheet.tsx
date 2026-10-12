@@ -159,6 +159,7 @@ export function HelpSheet({ open, onClose }: HelpSheetProps) {
                 lead={<Combos of={[[t("key.home")], [t("key.end")]]} />}
                 desc={t("help.firstLast")}
               />
+              <Row lead={<Combos of={[["M"]]} />} desc={t("help.mute")} />
               <Group title={t("help.group.selection")} />
               <Row lead={<Combos of={[["I"], ["O"]]} />} desc={t("help.inOut")} />
               <Row

@@ -155,13 +155,7 @@ export function Stage({ videoRef, video, region, regionMode, onRegion }: StagePr
         className="stage__picture"
         style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h }}
       >
-        <video
-          ref={videoRef}
-          className="stage__video"
-          src={videoSrc(video.sha256)}
-          preload="auto"
-          muted
-        >
+        <video ref={videoRef} className="stage__video" src={videoSrc(video.sha256)} preload="auto">
           <track kind="captions" />
         </video>
         <RegionOverlay video={video} region={region} active={regionMode} onCommit={onRegion} />
