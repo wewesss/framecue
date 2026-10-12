@@ -154,6 +154,35 @@ describe("watchVideo", () => {
     await sleep(1200);
     expect(count).toBe(2);
   }, 40_000);
+
+  test("keeps triggering after the parent folder is deleted and recreated", async () => {
+    const outDir = join(dir, "out");
+    await mkdir(outDir, { recursive: true });
+    const clip = join(outDir, "watched.mp4");
+    await renderClip(clip);
+    let count = 0;
+    const close = watchVideo(
+      clip,
+      () => {
+        count++;
+      },
+      { pollMs: 50, quietMs: 500, heartbeatMs: 300 },
+    );
+    try {
+      await rm(outDir, { recursive: true, force: true });
+      await mkdir(outDir, { recursive: true });
+      await renderClip(clip, { box: [10, 20] });
+      await waitFor(() => count >= 1, 8000);
+      expect(count).toBe(1);
+
+      await renderClip(clip, { box: [30, 40] });
+      await waitFor(() => count >= 2, 8000);
+      await sleep(1200);
+      expect(count).toBe(2);
+    } finally {
+      close();
+    }
+  }, 40_000);
 });
 
 describe("captureAfter", () => {
