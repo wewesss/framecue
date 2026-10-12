@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "framecue": {
+      "command": "npx",
+      "args": ["-y", "framecue", "mcp"]
+    }
+  }
+}
