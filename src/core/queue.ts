@@ -3,6 +3,7 @@ import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promise
 import { dirname, join, resolve } from "node:path";
 import { captureItemImages } from "./frames";
 import { withFileLock } from "./lock";
+import { normalizeRegions } from "./regions";
 import { afterDirName, captureAfter } from "./render";
 import { frameToTimecode } from "./timecode";
 import type { Item, ItemKind, ItemStatus, Region, VideoInfo } from "./types";
@@ -79,7 +80,9 @@ export async function readQueue(root: string): Promise<Item[]> {
   text.split(/\r?\n/).forEach((line, i) => {
     if (!line.trim()) return;
     try {
-      const item = JSON.parse(line) as Item;
+      const item = JSON.parse(line) as Item & { region?: unknown };
+      item.regions = normalizeRegions(item);
+      delete item.region;
       item.after ??= null;
       items.push(item);
     } catch (error) {
@@ -106,7 +109,13 @@ export function newId(): string {
   return `fc_${Date.now().toString(36)}${rand}`;
 }
 
+function validateRegions(regions: Region[]): void {
+  if (!Array.isArray(regions)) throw new Error("Region list must be an array");
+  for (const region of regions) validateRegion(region);
+}
+
 function validateRegion(region: Region): void {
+  if (typeof region !== "object" || region === null) throw new Error("Region must be an object");
   for (const key of ["x", "y", "w", "h"] as const) {
     const v = region[key];
     if (typeof v !== "number" || !Number.isFinite(v) || v < 0 || v > 1) {
@@ -120,7 +129,7 @@ export interface CreateItemInput {
   kind: ItemKind;
   frameStart: number;
   frameEnd?: number;
-  region?: Region | null;
+  regions?: Region[];
   comment: string;
   sha256: string;
 }
@@ -137,8 +146,11 @@ export function createItem(root: string, input: CreateItemInput): Promise<Item> 
       throw new Error(`Frames must be within [0, ${video.frameCount - 1}]`);
     }
     if (frameStart > frameEnd) throw new Error("frameStart must be <= frameEnd");
-    if (kind === "region" && !input.region) throw new Error("A region item requires a region");
-    if (input.region) validateRegion(input.region);
+    const regions = input.regions ?? [];
+    if (kind === "region" && regions.length === 0) {
+      throw new Error("A region item requires at least one region");
+    }
+    validateRegions(regions);
 
     const items = await readQueue(root);
     const id = newId();
@@ -153,7 +165,7 @@ export function createItem(root: string, input: CreateItemInput): Promise<Item> 
       frameStart,
       frameEnd,
       timecode: frameToTimecode(frameStart, video.fps),
-      region: input.region ?? null,
+      regions,
       comment: input.comment,
       priority: items.reduce((m, it) => Math.max(m, it.priority), -1) + 1,
       status: "todo",
@@ -173,7 +185,7 @@ export interface ItemPatch {
   priority?: number;
   status?: ItemStatus;
   agentNote?: string | null;
-  region?: Region | null;
+  regions?: Region[];
 }
 
 export function updateItem(
@@ -193,12 +205,12 @@ export function updateItem(
     ) {
       throw new Error(`Invalid status transition: ${item.status} -> ${patch.status}`);
     }
-    if (patch.region) validateRegion(patch.region);
+    if (patch.regions) validateRegions(patch.regions);
     if (patch.comment !== undefined) item.comment = patch.comment;
     if (patch.priority !== undefined) item.priority = patch.priority;
     if (patch.status !== undefined) item.status = patch.status;
     if (patch.agentNote !== undefined) item.agentNote = patch.agentNote;
-    if (patch.region !== undefined) item.region = patch.region;
+    if (patch.regions !== undefined) item.regions = patch.regions;
     item.updatedAt = new Date().toISOString();
     await writeQueue(root, items);
     return item;

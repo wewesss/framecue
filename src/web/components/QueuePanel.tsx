@@ -1,5 +1,13 @@
 import classigo from "classigo";
-import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type CSSProperties,
+  type KeyboardEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { regionColor } from "../../core/regions";
 import type { Item, ItemKind, ItemStatus } from "../../core/types";
 import type { ExportFormat } from "../api";
 import { shortTimecode } from "../format";
@@ -248,6 +256,24 @@ export function QueuePanel({
                       </span>
                     </Tooltip>
                     <span>{t("unit.frames", { n: item.frameEnd - item.frameStart + 1 })}</span>
+                    {item.regions.length > 0 && (
+                      <Tooltip tip={t("queue.regions", { n: item.regions.length })}>
+                        <span
+                          className="row__regions"
+                          role="img"
+                          aria-label={t("queue.regions", { n: item.regions.length })}
+                        >
+                          {item.regions.map((_region, index) => (
+                            <i
+                              // biome-ignore lint/suspicious/noArrayIndexKey: regions have no id, their order is their identity
+                              key={index}
+                              className="row__region"
+                              style={{ "--rc": regionColor(index).hex } as CSSProperties}
+                            />
+                          ))}
+                        </span>
+                      </Tooltip>
+                    )}
                     {needsVerification(item) && (
                       <Tooltip tip={t("queue.afterDotTip")}>
                         <span className="row__after" role="img" aria-label={t("queue.afterDot")} />

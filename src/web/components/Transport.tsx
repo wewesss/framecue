@@ -80,7 +80,8 @@ export function Transport({
   const silent = volume.muted || volume.level === 0;
   const hasRange = selection.in !== null && selection.out !== null;
   const duration = hasRange ? Math.abs((selection.out ?? 0) - (selection.in ?? 0)) + 1 : 1;
-  const hasSelection = selection.in !== null || selection.out !== null || selection.region !== null;
+  const hasSelection =
+    selection.in !== null || selection.out !== null || selection.regions.length > 0;
 
   return (
     <section className="transport" aria-label={t("transport.label")}>

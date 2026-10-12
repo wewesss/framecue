@@ -24,7 +24,7 @@ function fakeItem(id: string, priority: number, comment: string): Item {
     frameStart: 0,
     frameEnd: 0,
     timecode: "00:00:00:00",
-    region: null,
+    regions: [],
     comment,
     priority,
     status: "todo",

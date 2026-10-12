@@ -18,7 +18,7 @@ function item(id: string, priority: number, over: Partial<Item> = {}): Item {
     frameStart: 10,
     frameEnd: 10,
     timecode: "00:00:00:10",
-    region: null,
+    regions: [],
     comment: `comment ${id}`,
     priority,
     status: "todo",
@@ -49,7 +49,7 @@ const items: Item[] = [
   item("b", 1, {
     kind: "region",
     status: "reopened",
-    region: { x: 0.25, y: 0.5, w: 0.5, h: 0.25 },
+    regions: [{ x: 0.25, y: 0.5, w: 0.5, h: 0.25 }],
     after: {
       sha256: "deadbeef00112233",
       capturedAt: "2026-01-02T00:00:00.000Z",
@@ -96,8 +96,9 @@ describe("toMarkdown", () => {
     expect(md).toContain("- id: a");
     expect(md).toContain("- status: reopened");
     expect(md).toContain("  > Overlap\n  > second line");
+    expect(md).toContain("- regions:");
     expect(md).toContain(
-      "Region (normalised 0–1): x=0.25 y=0.5 w=0.5 h=0.25; in source pixels (1920x1080): x=480 y=540 w=960 h=270",
+      "  - region 1 (blue): normalised 0–1 x=0.25 y=0.5 w=0.5 h=0.25; in source pixels (1920x1080): x=480 y=540 w=960 h=270",
     );
     expect(md).toContain(`  - contact sheet: ${resolve(WS, "frames/a/sheet.png")}`);
     expect(md).toContain("- images (after, render deadbeef):");
@@ -114,6 +115,56 @@ describe("toMarkdown", () => {
     const paths = [...md.matchAll(/: (.+\.png)$/gm)].map((m) => m[1] as string);
     expect(paths.length).toBe(7);
     for (const p of paths) expect(p).toBe(resolve(p));
+  });
+});
+
+describe("several regions", () => {
+  const regions = Array.from({ length: 7 }, (_, i) => ({ x: i / 10, y: 0.1, w: 0.1, h: 0.2 }));
+  const many = [item("m", 0, { kind: "region", regions })];
+
+  test("markdown lists every region with number, colour and both rectangles", () => {
+    const md = toMarkdown(many, ctx);
+    const lines = md.split("\n").filter((l) => l.startsWith("  - region "));
+    expect(lines.length).toBe(7);
+    expect(lines.map((l) => l.match(/region (\d+) \((\w+)\)/)?.slice(1))).toEqual([
+      ["1", "blue"],
+      ["2", "red"],
+      ["3", "green"],
+      ["4", "orange"],
+      ["5", "purple"],
+      ["6", "cyan"],
+      ["7", "blue"],
+    ]);
+    expect(lines[1]).toBe(
+      "  - region 2 (red): normalised 0–1 x=0.1 y=0.1 w=0.1 h=0.2; in source pixels (1920x1080): x=192 y=108 w=192 h=216",
+    );
+  });
+
+  test("markdown omits pixels when the video size is unknown", () => {
+    const md = toMarkdown(many.slice(0, 1), {
+      ...ctx,
+      video: { ...ctx.video, width: 0, height: 0 },
+    });
+    expect(md).toContain("  - region 1 (blue): normalised 0–1 x=0 y=0.1 w=0.1 h=0.2\n");
+    expect(md).not.toContain("in source pixels");
+  });
+
+  test("an item without region has no regions line", () => {
+    expect(toMarkdown([item("n", 0)], ctx)).not.toContain("- regions:");
+  });
+
+  test("jsonl keeps regions and adds the detailed list", () => {
+    const row = JSON.parse(toJsonl(many, ctx).trim());
+    expect(row.regions).toEqual(regions);
+    expect(row.region).toBeUndefined();
+    expect(row.regionsDetail.length).toBe(7);
+    expect(row.regionsDetail[1]).toEqual({
+      number: 2,
+      color: "red",
+      normalised: { x: 0.1, y: 0.1, w: 0.1, h: 0.2 },
+      pixels: { x: 192, y: 108, w: 192, h: 216 },
+    });
+    expect(row.regionsDetail[6].color).toBe("blue");
   });
 });
 

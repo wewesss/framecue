@@ -33,7 +33,10 @@ beforeAll(async () => {
       kind: "region",
       frameStart: 8,
       comment: "third",
-      region: { x: 0.5, y: 0.5, w: 0.25, h: 0.25 },
+      regions: [
+        { x: 0.5, y: 0.5, w: 0.25, h: 0.25 },
+        { x: 0, y: 0, w: 0.5, h: 0.5 },
+      ],
     }),
   );
   await fetch(`${base}/api/items/${made[2]?.id}`, {
@@ -76,6 +79,41 @@ describe("GET /api/export", () => {
     expect(rows[0].imagesAbs[0]).toBe(resolve(wsDir, "frames", made[0]?.id as string, "frame.png"));
     expect(rows[1].status).toBe("verified");
     expect(rows[0].videoAbs).toBe(resolve(fx.cfr));
+  });
+
+  test("every region is listed in markdown and jsonl", async () => {
+    const md = await (await fetch(`${base}/api/export?ids=${made[2]?.id}`)).text();
+    expect(md).toContain(
+      "  - region 1 (blue): normalised 0–1 x=0.5 y=0.5 w=0.25 h=0.25; in source pixels (160x90): x=80 y=45 w=40 h=23",
+    );
+    expect(md).toContain(
+      "  - region 2 (red): normalised 0–1 x=0 y=0 w=0.5 h=0.5; in source pixels (160x90): x=0 y=0 w=80 h=45",
+    );
+    const jsonl = await (await fetch(`${base}/api/export?format=jsonl&ids=${made[2]?.id}`)).text();
+    const row = JSON.parse(jsonl.trim());
+    expect(
+      row.regionsDetail.map((r: { number: number; color: string }) => [r.number, r.color]),
+    ).toEqual([
+      [1, "blue"],
+      [2, "red"],
+    ]);
+  });
+
+  test("REST payloads carry the regions and their detail", async () => {
+    const list = (await (await fetch(`${base}/api/items`)).json()) as (Item & {
+      regionsDetail: { number: number; color: string; pixels: unknown }[];
+    })[];
+    const withRegions = list.find((i) => i.id === made[2]?.id);
+    expect(withRegions?.regions.length).toBe(2);
+    expect(withRegions?.regionsDetail.map((r) => r.color)).toEqual(["blue", "red"]);
+    expect(withRegions?.regionsDetail[0]?.pixels).toEqual({ x: 80, y: 45, w: 40, h: 23 });
+    expect(list.find((i) => i.id === made[0]?.id)?.regions).toEqual([]);
+    const bad = await fetch(`${base}/api/items/${made[0]?.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ regions: "nope" }),
+    });
+    expect(bad.status).toBe(400);
   });
 
   test("ranks stay those of the whole queue", async () => {

@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
-import { readdir, writeFile } from "node:fs/promises";
+import { readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { type Fixtures, makeFixtures } from "./fixtures";
 import { sha256File } from "./hash";
@@ -81,17 +81,31 @@ describe("queue", () => {
       ...base,
       kind: "region",
       frameStart: 1,
-      region: { x: 0.1, y: 0.2, w: 0.3, h: 0.4 },
+      regions: [{ x: 0.1, y: 0.2, w: 0.3, h: 0.4 }],
     });
-    expect(ok.region).toEqual({ x: 0.1, y: 0.2, w: 0.3, h: 0.4 });
+    expect(ok.regions).toEqual([{ x: 0.1, y: 0.2, w: 0.3, h: 0.4 }]);
     await expect(createItem(root, { ...base, kind: "region", frameStart: 1 })).rejects.toThrow();
     await expect(
       createItem(root, {
         ...base,
         kind: "region",
         frameStart: 1,
-        region: { x: 2, y: 0, w: 1, h: 1 },
+        regions: [{ x: 2, y: 0, w: 1, h: 1 }],
       }),
+    ).rejects.toThrow();
+    await expect(
+      createItem(root, {
+        ...base,
+        kind: "region",
+        frameStart: 1,
+        regions: [
+          { x: 0.1, y: 0.1, w: 0.2, h: 0.2 },
+          { x: 0.1, y: 0.1, w: 2, h: 0.2 },
+        ],
+      }),
+    ).rejects.toThrow();
+    await expect(
+      createItem(root, { ...base, kind: "region", frameStart: 1, regions: [] }),
     ).rejects.toThrow();
     await expect(createItem(root, { ...base, kind: "frame", frameStart: 50 })).rejects.toThrow();
     await expect(createItem(root, { ...base, kind: "frame", frameStart: -1 })).rejects.toThrow();
@@ -99,6 +113,80 @@ describe("queue", () => {
       createItem(root, { ...base, kind: "range", frameStart: 9, frameEnd: 3 }),
     ).rejects.toThrow();
     expect((await readQueue(root)).length).toBe(1);
+  });
+
+  test("several regions round trip, in order, and only the new field is written", async () => {
+    const { root } = await resolveWorkspace(fx.cfr, join(fx.dir, "ws2b"));
+    const regions = [
+      { x: 0.1, y: 0.2, w: 0.3, h: 0.4 },
+      { x: 0.5, y: 0.5, w: 0.2, h: 0.1 },
+      { x: 0, y: 0, w: 1, h: 1 },
+    ];
+    const created = await createItem(root, {
+      video: info,
+      kind: "region",
+      frameStart: 1,
+      comment: "m",
+      sha256: sha,
+      regions,
+    });
+    expect(created.regions).toEqual(regions);
+    expect((await readQueue(root))[0]?.regions).toEqual(regions);
+
+    const swapped = [regions[2], regions[0]] as typeof regions;
+    const updated = await updateItem(root, created.id, { regions: swapped });
+    expect(updated.regions).toEqual(swapped);
+    expect((await readQueue(root))[0]?.regions).toEqual(swapped);
+    await expect(
+      updateItem(root, created.id, { regions: [{ x: 0, y: 0, w: 1, h: 3 }] }),
+    ).rejects.toThrow();
+
+    const line = JSON.parse((await readFile(join(root, "queue.jsonl"), "utf8")).trim());
+    expect(line.regions).toEqual(swapped);
+    expect("region" in line).toBe(false);
+  });
+
+  test("old lines with a single region or none are read as regions", async () => {
+    const { root } = await resolveWorkspace(fx.cfr, join(fx.dir, "ws2c"));
+    const old = (id: string, priority: number, extra: Record<string, unknown>) =>
+      JSON.stringify({
+        id,
+        video: { path: fx.cfr, sha256: sha },
+        fps: info.fps,
+        kind: "region",
+        frameStart: 1,
+        frameEnd: 1,
+        timecode: "00:00:00:01",
+        comment: id,
+        priority,
+        status: "todo",
+        images: [],
+        agentNote: null,
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        ...extra,
+      });
+    const region = { x: 0.1, y: 0.2, w: 0.3, h: 0.4 };
+    await writeFile(
+      join(root, "queue.jsonl"),
+      [
+        old("one", 0, { region }),
+        old("null", 1, { region: null }),
+        old("absent", 2, {}),
+        old("new", 3, { regions: [region, region] }),
+      ].join("\n"),
+    );
+    const read = await readQueue(root);
+    expect(read.map((i) => i.regions)).toEqual([[region], [], [], [region, region]]);
+    expect(read.some((i) => "region" in i)).toBe(false);
+
+    await updateItem(root, "one", { comment: "touched" });
+    const lines = (await readFile(join(root, "queue.jsonl"), "utf8"))
+      .trim()
+      .split("\n")
+      .map((l) => JSON.parse(l));
+    expect(lines[0].regions).toEqual([region]);
+    expect("region" in lines[0]).toBe(false);
   });
 
   test("status transitions", async () => {

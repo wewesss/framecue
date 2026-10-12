@@ -23,9 +23,9 @@ import { RegionOverlay } from "./RegionOverlay";
 interface StageProps {
   videoRef: RefObject<HTMLVideoElement | null>;
   video: { width: number; height: number; sha256: string };
-  region: Region | null;
+  regions: Region[];
   regionMode: boolean;
-  onRegion: (region: Region) => void;
+  onRegions: (regions: Region[]) => void;
 }
 
 interface PanDrag {
@@ -35,7 +35,7 @@ interface PanDrag {
   pan: Pan;
 }
 
-export function Stage({ videoRef, video, region, regionMode, onRegion }: StageProps) {
+export function Stage({ videoRef, video, regions, regionMode, onRegions }: StageProps) {
   const t = useT();
   const boxRef = useRef<HTMLDivElement>(null);
   const [box, setBox] = useState({ w: 0, h: 0 });
@@ -158,7 +158,7 @@ export function Stage({ videoRef, video, region, regionMode, onRegion }: StagePr
         <video ref={videoRef} className="stage__video" src={videoSrc(video.sha256)} preload="auto">
           <track kind="captions" />
         </video>
-        <RegionOverlay video={video} region={region} active={regionMode} onCommit={onRegion} />
+        <RegionOverlay video={video} regions={regions} active={regionMode} onChange={onRegions} />
       </div>
       <div className="stage__hud" data-hud>
         <span className="stage__chip num">

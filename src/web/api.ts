@@ -9,7 +9,7 @@ export interface NewItem {
   kind: ItemKind;
   frameStart: number;
   frameEnd?: number;
-  region?: Region | null;
+  regions?: Region[];
   comment: string;
 }
 
@@ -17,7 +17,7 @@ export interface ItemChanges {
   comment?: string;
   status?: ItemStatus;
   priority?: number;
-  region?: Region | null;
+  regions?: Region[];
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {

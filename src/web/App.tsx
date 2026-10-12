@@ -201,7 +201,7 @@ export function App() {
   const add = useCallback(async () => {
     if (!info || busy) return;
     const isRange = selection.in !== null && selection.out !== null && selection.in < selection.out;
-    const kind: ItemKind = selection.region ? "region" : isRange ? "range" : "frame";
+    const kind: ItemKind = selection.regions.length > 0 ? "region" : isRange ? "range" : "frame";
     const frameStart = isRange ? (selection.in as number) : frame;
     const frameEnd = isRange ? (selection.out as number) : frameStart;
     setBusy(true);
@@ -210,7 +210,7 @@ export function App() {
         kind,
         frameStart,
         frameEnd,
-        region: selection.region,
+        regions: selection.regions,
         comment: "",
       });
       setItems(await api.items());
@@ -326,7 +326,7 @@ export function App() {
     setSelection({
       in: item.frameStart,
       out: item.frameEnd > item.frameStart ? item.frameEnd : null,
-      region: item.region ?? null,
+      regions: item.regions,
     });
   };
 
@@ -400,8 +400,8 @@ export function App() {
       });
   };
 
-  const onRegion = (region: Region) => {
-    setSelection((s) => ({ ...s, region }));
+  const onRegions = (regions: Region[]) => {
+    setSelection((s) => ({ ...s, regions }));
   };
 
   const onRange = useCallback((range: { in: number | null; out: number | null }) => {
@@ -468,9 +468,9 @@ export function App() {
               <Stage
                 videoRef={videoRef}
                 video={info}
-                region={selection.region}
+                regions={selection.regions}
                 regionMode={regionMode}
-                onRegion={onRegion}
+                onRegions={onRegions}
               />
               <Timeline
                 video={info}

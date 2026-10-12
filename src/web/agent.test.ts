@@ -9,6 +9,7 @@ const base: Omit<Item, "id" | "status"> = {
   frameStart: 0,
   frameEnd: 0,
   timecode: "00:00:00:00",
+  regions: [],
   comment: "",
   priority: 0,
   images: [],

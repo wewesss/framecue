@@ -1,5 +1,6 @@
 import classigo from "classigo";
-import { useEffect, useRef, useState } from "react";
+import { type CSSProperties, Fragment, useEffect, useRef, useState } from "react";
+import { regionColor } from "../../core/regions";
 import type { Item, ItemStatus } from "../../core/types";
 import { type ExportFormat, frameImageUrl, type ItemChanges } from "../api";
 import { ageSince, captureTiles } from "../format";
@@ -247,17 +248,23 @@ function ItemForm({
             )}
             <br />
             {isRange ? `${startTc} → ${itemTimecode(item, item.frameEnd)}` : startTc}
-            {item.region && (
-              <>
+            {item.regions.map((region, index) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: regions have no id, their order is their identity
+              <Fragment key={index}>
                 <span className="detail__sep">·</span>
-                <span className="detail__zone">
+                <span
+                  className="detail__zone"
+                  style={{ "--rc": regionColor(index).hex } as CSSProperties}
+                >
+                  <i className="detail__dot" />
                   {t("detail.zone", {
-                    w: number3.format(item.region.w),
-                    h: number3.format(item.region.h),
+                    n: index + 1,
+                    w: number3.format(region.w),
+                    h: number3.format(region.h),
                   })}
                 </span>
-              </>
-            )}
+              </Fragment>
+            ))}
           </div>
         </div>
         <Tooltip tip={t("detail.goTo")}>

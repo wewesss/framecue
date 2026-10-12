@@ -13,6 +13,7 @@ import {
   probeVideo,
   rankMap,
   readQueue,
+  regionDetails,
   updateItem,
 } from "../core";
 
@@ -128,7 +129,15 @@ export function createFramecueServer(root: string): McpServer {
     for (const rel of item.images) await attach("Before", rel);
     if (item.after) for (const rel of item.after.images) await attach("After", rel);
     if (notes.length > 0) content.push({ type: "text", text: notes.join("\n") });
-    return { content };
+    return {
+      content,
+      structuredContent: {
+        item: {
+          ...summarise(item, ranks),
+          regions: regionDetails(item.regions, ctx.video),
+        },
+      },
+    };
   };
 
   server.registerTool(
@@ -174,7 +183,7 @@ export function createFramecueServer(root: string): McpServer {
     {
       title: "Get one item",
       description:
-        "Return the full details of one item: kind, frames and timecode, comment, region (normalised and in source pixels), status, agent note, absolute image paths, and the images themselves as PNG (before; plus after-render images when available). The contact sheet is skipped when larger than 2 MB.",
+        "Return the full details of one item: kind, frames and timecode, comment, every region (numbered from 1, with its colour name, normalised and in source pixels), status, agent note, absolute image paths, and the images themselves as PNG (before; plus after-render images when available). The contact sheet is skipped when larger than 2 MB.",
       inputSchema: { id: z.string().min(1).describe("Item id, e.g. fc_xxxxxxxx") },
       annotations: { readOnlyHint: true },
     },

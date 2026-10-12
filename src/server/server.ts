@@ -24,11 +24,13 @@ import {
   type Peaks,
   probeVideo,
   type Region,
+  type RegionDetail,
   type RenderEvent,
   type RenderSkip,
   type RenderSource,
   rankMap,
   readQueue,
+  regionDetails,
   reorder,
   resolveWorkspace,
   sha256File,
@@ -206,10 +208,21 @@ function parseStatus(value: string | null | undefined): ItemStatus | undefined {
   return value as ItemStatus;
 }
 
-function parseRegion(value: unknown): Region | null | undefined {
-  if (value === undefined || value === null) return value;
-  if (typeof value !== "object" || Array.isArray(value)) fail(400, "Invalid region");
-  return value as Region;
+function parseRegions(value: unknown): Region[] | undefined {
+  if (value === undefined) return value;
+  if (!Array.isArray(value)) fail(400, "Invalid regions");
+  for (const entry of value) {
+    if (typeof entry !== "object" || entry === null || Array.isArray(entry)) {
+      fail(400, "Invalid regions");
+    }
+  }
+  return value as Region[];
+}
+
+type ItemView = Item & { regionsDetail: RegionDetail[] };
+
+function present(item: Item, size: { width: number; height: number }): ItemView {
+  return { ...item, regionsDetail: regionDetails(item.regions, size) };
 }
 
 function parsePatch(body: Record<string, unknown>): ItemPatch {
@@ -234,7 +247,7 @@ function parsePatch(body: Record<string, unknown>): ItemPatch {
     }
     patch.agentNote = body.agentNote;
   }
-  if (body.region !== undefined) patch.region = parseRegion(body.region);
+  if (body.regions !== undefined) patch.regions = parseRegions(body.regions);
   return patch;
 }
 
@@ -301,10 +314,11 @@ async function serveAudioPeaks({ peaks }: Ctx): Promise<Response> {
   });
 }
 
-async function listItems({ url, workspace }: Ctx): Promise<Response> {
+async function listItems({ url, workspace, info }: Ctx): Promise<Response> {
   const status = parseStatus(url.searchParams.get("status"));
   const items = await readQueue(workspace);
-  return json(status ? items.filter((it) => it.status === status) : items);
+  const chosen = status ? items.filter((it) => it.status === status) : items;
+  return json(chosen.map((it) => present(it, info)));
 }
 
 async function exportQueue({ url, workspace, info }: Ctx): Promise<Response> {
@@ -355,20 +369,21 @@ async function postItem({ request, info, sha256, workspace }: Ctx): Promise<Resp
     kind: body.kind as ItemKind,
     frameStart: body.frameStart,
     frameEnd: body.frameEnd as number | undefined,
-    region: parseRegion(body.region),
+    regions: parseRegions(body.regions),
     comment: body.comment,
   });
-  return json(item, 201);
+  return json(present(item, info), 201);
 }
 
-async function patchItem({ request, parts, workspace }: Ctx): Promise<Response> {
+async function patchItem({ request, parts, workspace, info }: Ctx): Promise<Response> {
   const patch = parsePatch(await readBody(request));
-  return json(await updateItem(workspace, parts[2] as string, patch, { actor: "user" }));
+  const updated = await updateItem(workspace, parts[2] as string, patch, { actor: "user" });
+  return json(present(updated, info));
 }
 
-async function recaptureAfter({ parts, capture }: Ctx): Promise<Response> {
+async function recaptureAfter({ parts, capture, info }: Ctx): Promise<Response> {
   const item = await capture(parts[2] as string);
-  return json(item);
+  return json(present(item, info));
 }
 
 function openEvents({ events }: Ctx): Response {
@@ -380,12 +395,13 @@ async function removeItem({ parts, workspace }: Ctx): Promise<Response> {
   return new Response(null, { status: 204 });
 }
 
-async function reorderItems({ request, workspace }: Ctx): Promise<Response> {
+async function reorderItems({ request, workspace, info }: Ctx): Promise<Response> {
   const body = await readBody(request);
   if (!Array.isArray(body.ids) || !body.ids.every((id) => typeof id === "string")) {
     fail(400, "ids must be an array of strings");
   }
-  return json(await reorder(workspace, body.ids as string[]));
+  const ordered = await reorder(workspace, body.ids as string[]);
+  return json(ordered.map((it) => present(it, info)));
 }
 
 async function serveFrame({ parts, workspace }: Ctx): Promise<Response> {

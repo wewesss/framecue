@@ -222,6 +222,21 @@
     opacity: 0.4;
   }
 
+  &__regions {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 3px;
+  }
+
+  &__region {
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    background: var(--rc);
+    box-shadow: 0 0 0 1px var(--region-outline);
+  }
+
   &__after {
     flex: none;
     width: 7px;
