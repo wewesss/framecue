@@ -45,6 +45,7 @@ import { Button } from "./ui/Button";
 import { Tooltip, TooltipHost } from "./ui/Tooltip";
 import { useVideoFrame } from "./useVideoFrame";
 import { needsVerification, nextToVerify } from "./verify";
+import { useVolume } from "./volume";
 
 const PANEL_MIN = 320;
 const PANEL_MAX = 400;
@@ -96,6 +97,7 @@ export function App() {
   frameLatest.current = frame;
   const resumeFrame = useRef<number | null>(null);
   const tl = useTimelineView(info?.frameCount ?? 0);
+  const [volume, setVolume, toggleMute] = useVolume(videoRef, info !== null);
 
   const report = useCallback((e: unknown) => {
     setError(e instanceof Error ? e.message : String(e));
@@ -199,7 +201,7 @@ export function App() {
   const add = useCallback(async () => {
     if (!info || busy) return;
     const isRange = selection.in !== null && selection.out !== null && selection.in < selection.out;
-    const kind: ItemKind = selection.region ? "region" : isRange ? "range" : "frame";
+    const kind: ItemKind = selection.regions.length > 0 ? "region" : isRange ? "range" : "frame";
     const frameStart = isRange ? (selection.in as number) : frame;
     const frameEnd = isRange ? (selection.out as number) : frameStart;
     setBusy(true);
@@ -208,7 +210,7 @@ export function App() {
         kind,
         frameStart,
         frameEnd,
-        region: selection.region,
+        regions: selection.regions,
         comment: "",
       });
       setItems(await api.items());
@@ -245,6 +247,7 @@ export function App() {
     reopen: () =>
       selectedItem && needsVerification(selectedItem) && void verdict(selectedItem.id, "reopened"),
     copy: () => void copyForAgent("md"),
+    mute: toggleMute,
   };
   const handlersRef = useRef(handlers);
   handlersRef.current = handlers;
@@ -323,7 +326,7 @@ export function App() {
     setSelection({
       in: item.frameStart,
       out: item.frameEnd > item.frameStart ? item.frameEnd : null,
-      region: item.region ?? null,
+      regions: item.regions,
     });
   };
 
@@ -397,8 +400,8 @@ export function App() {
       });
   };
 
-  const onRegion = (region: Region) => {
-    setSelection((s) => ({ ...s, region }));
+  const onRegions = (regions: Region[]) => {
+    setSelection((s) => ({ ...s, regions }));
   };
 
   const onRange = useCallback((range: { in: number | null; out: number | null }) => {
@@ -465,9 +468,9 @@ export function App() {
               <Stage
                 videoRef={videoRef}
                 video={info}
-                region={selection.region}
+                regions={selection.regions}
                 regionMode={regionMode}
-                onRegion={onRegion}
+                onRegions={onRegions}
               />
               <Timeline
                 video={info}
@@ -508,6 +511,7 @@ export function App() {
                 selection={selection}
                 regionMode={regionMode}
                 busy={busy}
+                volume={volume}
                 onToggle={player.toggle}
                 onStep={player.step}
                 onSeek={seekTo}
@@ -516,6 +520,8 @@ export function App() {
                 onToggleRegion={() => setRegionMode((on) => !on)}
                 onClear={clear}
                 onAdd={() => void add()}
+                onVolume={setVolume}
+                onToggleMute={toggleMute}
               />
             </>
           ) : (
@@ -547,6 +553,7 @@ export function App() {
             onFilter={setFilter}
             onSelect={select}
             onReorder={reorder}
+            onDelete={remove}
             onCopy={(format, ids) => void copyForAgent(format, ids)}
           />
           <ItemDetail

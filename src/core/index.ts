@@ -5,6 +5,7 @@ export * from "./lock";
 export * from "./peaks";
 export * from "./probe";
 export * from "./queue";
+export * from "./regions";
 export * from "./render";
 export * from "./timecode";
 export * from "./types";

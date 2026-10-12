@@ -22,7 +22,7 @@ export interface Item {
   frameStart: number;
   frameEnd: number;
   timecode: string;
-  region?: Region | null;
+  regions: Region[];
   comment: string;
   priority: number;
   status: ItemStatus;

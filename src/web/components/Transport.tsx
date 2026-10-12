@@ -7,6 +7,7 @@ import { Button, IconButton } from "../ui/Button";
 import { Icon } from "../ui/Icon";
 import { Kbd } from "../ui/Kbd";
 import { Tooltip } from "../ui/Tooltip";
+import type { Volume } from "../volume";
 
 interface TransportProps {
   frame: number;
@@ -16,6 +17,7 @@ interface TransportProps {
   selection: Selection;
   regionMode: boolean;
   busy: boolean;
+  volume: Volume;
   onToggle: () => void;
   onStep: (n: number) => void;
   onSeek: (frame: number) => void;
@@ -24,6 +26,8 @@ interface TransportProps {
   onToggleRegion: () => void;
   onClear: () => void;
   onAdd: () => void;
+  onVolume: (level: number) => void;
+  onToggleMute: () => void;
 }
 
 function parseFrame(text: string): number | null {
@@ -39,6 +43,7 @@ export function Transport({
   selection,
   regionMode,
   busy,
+  volume,
   onToggle,
   onStep,
   onSeek,
@@ -47,6 +52,8 @@ export function Transport({
   onToggleRegion,
   onClear,
   onAdd,
+  onVolume,
+  onToggleMute,
 }: TransportProps) {
   const t = useT();
   const [draft, setDraft] = useState<string | null>(null);
@@ -70,9 +77,11 @@ export function Transport({
     }
   };
 
+  const silent = volume.muted || volume.level === 0;
   const hasRange = selection.in !== null && selection.out !== null;
   const duration = hasRange ? Math.abs((selection.out ?? 0) - (selection.in ?? 0)) + 1 : 1;
-  const hasSelection = selection.in !== null || selection.out !== null || selection.region !== null;
+  const hasSelection =
+    selection.in !== null || selection.out !== null || selection.regions.length > 0;
 
   return (
     <section className="transport" aria-label={t("transport.label")}>
@@ -96,6 +105,27 @@ export function Transport({
             <span className="frame-field__total num">/ {last}</span>
           </label>
         </Tooltip>
+        <div className="volume">
+          <Tooltip tip={silent ? t("transport.unmute") : t("transport.mute")} keys={["M"]}>
+            <IconButton
+              icon={silent ? "speaker.slash" : "speaker.wave.2"}
+              label={silent ? t("transport.unmute") : t("transport.mute")}
+              size="sm"
+              pressed={silent}
+              onClick={onToggleMute}
+            />
+          </Tooltip>
+          <input
+            className="volume__slider"
+            type="range"
+            min={0}
+            max={1}
+            step={0.01}
+            aria-label={t("transport.volume")}
+            value={silent ? 0 : volume.level}
+            onChange={(event) => onVolume(Number.parseFloat(event.target.value))}
+          />
+        </div>
       </div>
 
       <div className="transport__controls">

@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
 import { compile } from "matchigo";
+import { type RegionDetail, regionDetails } from "./regions";
 import type { Item } from "./types";
 
 export interface ExportContext {
@@ -59,14 +60,23 @@ function framesLabel(item: Item): string {
     : `frame ${item.frameStart}`;
 }
 
-function regionLine(ctx: ExportContext, item: Item): string | null {
-  const r = item.region;
-  if (!r) return null;
+function rectText(r: { x: number; y: number; w: number; h: number }): string {
+  return `x=${r.x} y=${r.y} w=${r.w} h=${r.h}`;
+}
+
+function regionLines(ctx: ExportContext, item: Item): string[] {
   const { width, height } = ctx.video;
-  const px = (v: number, size: number) => Math.round(v * size);
-  const normalised = `Region (normalised 0–1): x=${r.x} y=${r.y} w=${r.w} h=${r.h}`;
-  if (!(width > 0 && height > 0)) return normalised;
-  return `${normalised}; in source pixels (${width}x${height}): x=${px(r.x, width)} y=${px(r.y, height)} w=${px(r.w, width)} h=${px(r.h, height)}`;
+  const details = regionDetails(item.regions, ctx.video);
+  if (details.length === 0) return [];
+  return [
+    "- regions:",
+    ...details.map((d: RegionDetail) => {
+      const head = `  - region ${d.number} (${d.color}): normalised 0–1 ${rectText(d.normalised)}`;
+      return d.pixels
+        ? `${head}; in source pixels (${width}x${height}): ${rectText(d.pixels)}`
+        : head;
+    }),
+  ];
 }
 
 function section(ctx: ExportContext, item: Item, number: number): string {
@@ -84,8 +94,7 @@ function section(ctx: ExportContext, item: Item, number: number): string {
           .join("\n")}`
       : "- comment: (none)",
   );
-  const region = regionLine(ctx, item);
-  if (region) lines.push(`- ${region}`);
+  lines.push(...regionLines(ctx, item));
   lines.push("- images (before):", ...imageLines(ctx, item, item.images).map((l) => `  ${l}`));
   if (item.after && item.after.images.length > 0) {
     lines.push(
@@ -124,6 +133,7 @@ export function toJsonl(items: Item[], ctx: ExportContext): string {
     .map((item) => {
       const record = {
         ...item,
+        regionsDetail: regionDetails(item.regions, ctx.video),
         videoAbs: resolve(item.video.path),
         imagesAbs: item.images.map((image) => abs(ctx, image)),
         afterImagesAbs: (item.after?.images ?? []).map((image) => abs(ctx, image)),

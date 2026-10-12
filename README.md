@@ -49,7 +49,7 @@ The queue is plain files (`.framecue/queue.jsonl` and `.framecue/frames/<id>/*.p
 
 The queue footer has a "Copy for the agent" button (`Shift+C`). It copies the to-do and reopened items, by priority, with absolute image paths:
 
-- **Markdown**: a prompt for a coding agent. A header (video, resolution, fps, frame count, workspace, how to report back), then one section per item with its frames, timecode, comment, region (normalised and in source pixels), before and after images, and agent note.
+- **Markdown**: a prompt for a coding agent. A header (video, resolution, fps, frame count, workspace, how to report back), then one section per item with its frames, timecode, comment, every region (numbered, with its colour name, normalised and in source pixels), before and after images, and agent note.
 - **JSONL**: one stored item per line, plus `videoAbs`, `imagesAbs` and `afterImagesAbs`.
 
 The chevron next to the button picks the format, or copies every item shown by the current filter. The item menu (the `...` button) copies one item. The same output is served at `GET /api/export?format=md|jsonl&ids=a,b`.

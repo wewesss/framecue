@@ -113,6 +113,13 @@
     position: absolute;
     right: 0;
     left: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+
+  &__markers-in {
+    position: relative;
   }
 
   &__clip {

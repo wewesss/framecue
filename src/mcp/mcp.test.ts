@@ -52,7 +52,10 @@ beforeAll(async () => {
     ...base,
     kind: "region",
     frameStart: 2,
-    region: { x: 0.1, y: 0.1, w: 0.5, h: 0.5 },
+    regions: [
+      { x: 0.1, y: 0.1, w: 0.5, h: 0.5 },
+      { x: 0.5, y: 0.5, w: 0.25, h: 0.25 },
+    ],
     comment: "done long ago",
   });
   await updateItem(root, verifiedItem.id, { status: "verified" });
@@ -126,6 +129,34 @@ describe("framecue mcp over stdio", () => {
     ]);
     const missing = await client.callTool({ name: "get_item", arguments: { id: "nope" } });
     expect(missing.isError).toBe(true);
+  });
+
+  test("get_item lists every region in text and structured content", async () => {
+    const result = await client.callTool({ name: "get_item", arguments: { id: verifiedItem.id } });
+    const text = contentOf(result)[0]?.text ?? "";
+    expect(text).toContain("- regions:");
+    expect(text).toContain(
+      "  - region 1 (blue): normalised 0–1 x=0.1 y=0.1 w=0.5 h=0.5; in source pixels (",
+    );
+    expect(text).toContain(
+      "  - region 2 (red): normalised 0–1 x=0.5 y=0.5 w=0.25 h=0.25; in source pixels (",
+    );
+    const structured = result.structuredContent as {
+      item: {
+        id: string;
+        regions: { number: number; color: string; normalised: unknown; pixels: unknown }[];
+      };
+    };
+    expect(structured.item.id).toBe(verifiedItem.id);
+    expect(structured.item.regions.map((r) => [r.number, r.color])).toEqual([
+      [1, "blue"],
+      [2, "red"],
+    ]);
+    expect(structured.item.regions[1]?.normalised).toEqual({ x: 0.5, y: 0.5, w: 0.25, h: 0.25 });
+    expect(structured.item.regions[1]?.pixels).not.toBeNull();
+
+    const next = await client.callTool({ name: "next_item", arguments: {} });
+    expect((next.structuredContent as { item: { regions: unknown[] } }).item.regions).toEqual([]);
   });
 
   test("mark_fixed: todo to fixed, then refused", async () => {

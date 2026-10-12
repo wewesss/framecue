@@ -1,5 +1,13 @@
 import classigo from "classigo";
-import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type CSSProperties,
+  type KeyboardEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { regionColor } from "../../core/regions";
 import type { Item, ItemKind, ItemStatus } from "../../core/types";
 import type { ExportFormat } from "../api";
 import { shortTimecode } from "../format";
@@ -25,8 +33,11 @@ interface QueuePanelProps {
   onFilter: (filter: Filter) => void;
   onSelect: (item: Item) => void;
   onReorder: (ids: string[]) => void;
+  onDelete: (id: string) => void;
   onCopy: (format: ExportFormat, ids?: string[]) => void;
 }
+
+const ARM_MS = 3000;
 
 const kindKey = (kind: ItemKind) => `kind.${kind}` as const;
 
@@ -37,12 +48,14 @@ export function QueuePanel({
   onFilter,
   onSelect,
   onReorder,
+  onDelete,
   onCopy,
 }: QueuePanelProps) {
   const { t } = useI18n();
   const [announce, setAnnounce] = useState("");
   const listRef = useRef<HTMLDivElement>(null);
   const pendingFocus = useRef<string | null>(null);
+  const [armedId, setArmedId] = useState<string | null>(null);
 
   const sorted = useMemo(() => [...items].sort((a, b) => a.priority - b.priority), [items]);
   const visible = filter === "all" ? sorted : sorted.filter((it) => it.status === filter);
@@ -53,6 +66,12 @@ export function QueuePanel({
   const counts = Object.fromEntries(
     STATUSES.map((s) => [s, items.filter((it) => it.status === s).length]),
   ) as Record<ItemStatus, number>;
+
+  useEffect(() => {
+    if (armedId === null) return;
+    const timer = setTimeout(() => setArmedId(null), ARM_MS);
+    return () => clearTimeout(timer);
+  }, [armedId]);
 
   useEffect(() => {
     const id = pendingFocus.current;
@@ -182,6 +201,7 @@ export function QueuePanel({
           {visible.map((item, index) => {
             const isRange = item.frameEnd > item.frameStart;
             const selected = item.id === selectedId;
+            const armed = item.id === armedId;
             return (
               <div
                 key={item.id}
@@ -236,6 +256,24 @@ export function QueuePanel({
                       </span>
                     </Tooltip>
                     <span>{t("unit.frames", { n: item.frameEnd - item.frameStart + 1 })}</span>
+                    {item.regions.length > 0 && (
+                      <Tooltip tip={t("queue.regions", { n: item.regions.length })}>
+                        <span
+                          className="row__regions"
+                          role="img"
+                          aria-label={t("queue.regions", { n: item.regions.length })}
+                        >
+                          {item.regions.map((_region, index) => (
+                            <i
+                              // biome-ignore lint/suspicious/noArrayIndexKey: regions have no id, their order is their identity
+                              key={index}
+                              className="row__region"
+                              style={{ "--rc": regionColor(index).hex } as CSSProperties}
+                            />
+                          ))}
+                        </span>
+                      </Tooltip>
+                    )}
                     {needsVerification(item) && (
                       <Tooltip tip={t("queue.afterDotTip")}>
                         <span className="row__after" role="img" aria-label={t("queue.afterDot")} />
@@ -244,6 +282,23 @@ export function QueuePanel({
                   </div>
                 </div>
                 <StatusTag status={item.status} />
+                <Tooltip tip={armed ? t("queue.deleteConfirm") : t("queue.delete")}>
+                  <IconButton
+                    icon="trash"
+                    size="sm"
+                    className={classigo("row__del", { "row__del--armed": armed })}
+                    label={armed ? t("queue.deleteConfirm") : t("queue.delete")}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      if (armed) {
+                        setArmedId(null);
+                        onDelete(item.id);
+                      } else {
+                        setArmedId(item.id);
+                      }
+                    }}
+                  />
+                </Tooltip>
               </div>
             );
           })}

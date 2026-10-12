@@ -11,6 +11,7 @@ function item(id: string, status: ItemStatus, withAfter: boolean): Item {
     frameStart: 1,
     frameEnd: 1,
     timecode: "00:00:00:01",
+    regions: [],
     comment: "",
     priority: 0,
     status,

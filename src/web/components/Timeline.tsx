@@ -4,6 +4,7 @@ import {
   type PointerEvent,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -16,12 +17,14 @@ import { markerStatusClass } from "../status";
 import type { Theme } from "../theme";
 import { drawGrid, drawWave } from "../timeline/canvas";
 import {
-  CLIP_TOP,
   clampHeight,
   defaultHeight,
   LANE_GAP,
+  laneOffset,
   lanes,
   MARKERS_H,
+  markersContentHeight,
+  markersHeight,
   RULER_H,
 } from "../timeline/layout";
 import {
@@ -33,6 +36,7 @@ import {
   snapTargets,
 } from "../timeline/snap";
 import { rulerSteps } from "../timeline/ticks";
+import { assignLanes } from "../timeline/tracks";
 import { usePeaks } from "../timeline/usePeaks";
 import type { TimelineView } from "../timeline/useTimelineView";
 import {
@@ -131,6 +135,7 @@ export function Timeline({
   const peaks = usePeaks(hasAudio, video.sha256);
   const rootRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
+  const markersRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<HTMLCanvasElement>(null);
   const waveRef = useRef<HTMLCanvasElement>(null);
   const press = useRef<Press | null>(null);
@@ -150,11 +155,25 @@ export function Timeline({
   latest.current = { tl, selection, snap, longPress, saved, items, frame, fps, count };
 
   const waveOn = wave;
-  const height = clampHeight(
+  const baseHeight = clampHeight(
     userHeight ?? defaultHeight({ wave: waveOn, audio: hasAudio }),
     viewportH,
   );
-  const { clipH, audioH } = lanes(height, { wave: waveOn, audio: hasAudio });
+  const packing = useMemo(
+    () =>
+      assignLanes(
+        items
+          .filter((item) => item.frameStart < count)
+          .map((item) => ({ id: item.id, start: item.frameStart, end: item.frameEnd })),
+      ),
+    [items, count],
+  );
+  const markersH = markersHeight(packing.count);
+  const contentH = markersContentHeight(packing.count);
+  const extraH = markersH - MARKERS_H;
+  const height = baseHeight + extraH;
+  const clipTop = RULER_H + markersH;
+  const { clipH, audioH } = lanes(baseHeight, { wave: waveOn, audio: hasAudio });
   const xOf = (f: number) => ((f - view.v0) / span) * width;
 
   useEffect(() => {
@@ -164,15 +183,31 @@ export function Timeline({
   }, []);
 
   useEffect(() => {
-    const track = trackRef.current;
-    if (!track) return;
+    const trackEl = trackRef.current;
+    if (!trackEl) return;
     const observer = new ResizeObserver(([entry]) => {
       if (entry) tl.setWidth(entry.contentRect.width);
     });
-    observer.observe(track);
-    tl.setWidth(track.clientWidth);
+    observer.observe(trackEl);
+    tl.setWidth(trackEl.clientWidth);
     return () => observer.disconnect();
   }, [tl.setWidth]);
+
+  useLayoutEffect(() => {
+    const band = markersRef.current;
+    if (band) band.scrollTop = contentH - markersH;
+  }, [contentH, markersH]);
+
+  const selectedLane = selectedId ? packing.lanes.get(selectedId) : undefined;
+  useEffect(() => {
+    const band = markersRef.current;
+    if (!band || selectedLane === undefined || contentH <= markersH) return;
+    const top = laneOffset(selectedLane, packing.count);
+    if (top < band.scrollTop) band.scrollTop = top;
+    else if (top + MARKERS_H > band.scrollTop + band.clientHeight) {
+      band.scrollTop = top + MARKERS_H - band.clientHeight;
+    }
+  }, [selectedLane, packing.count, contentH, markersH]);
 
   useEffect(() => {
     if (press.current || saved) return;
@@ -198,6 +233,23 @@ export function Timeline({
       event.preventDefault();
       const { tl: current, saved: lp } = latest.current;
       if (lp) return;
+      const band = markersRef.current;
+      if (
+        band &&
+        band.scrollHeight > band.clientHeight &&
+        event.target instanceof Node &&
+        band.contains(event.target) &&
+        !event.shiftKey &&
+        Math.abs(event.deltaY) >= Math.abs(event.deltaX)
+      ) {
+        const atTop = event.deltaY < 0 && band.scrollTop <= 0;
+        const atBottom =
+          event.deltaY > 0 && band.scrollTop + band.clientHeight >= band.scrollHeight - 1;
+        if (!atTop && !atBottom) {
+          band.scrollTop += event.deltaY;
+          return;
+        }
+      }
       const bounds = trackRef.current?.getBoundingClientRect();
       if (!bounds) return;
       const x = clamp(event.clientX - bounds.left, 0, current.width);
@@ -254,6 +306,14 @@ export function Timeline({
     if (event.button !== 0) return;
     const target = event.target as HTMLElement;
     if (target.closest("[data-marker]")) return;
+    const band = markersRef.current;
+    if (
+      band &&
+      target === band &&
+      event.clientX >= band.getBoundingClientRect().left + band.clientWidth
+    ) {
+      return;
+    }
     event.currentTarget.setPointerCapture(event.pointerId);
     const x = clamp(localX(event), 0, width);
     const grabbed = target.closest<HTMLElement>("[data-handle]")?.dataset.handle;
@@ -336,7 +396,7 @@ export function Timeline({
     event.currentTarget.setPointerCapture(event.pointerId);
     setResizing(true);
     const y0 = event.clientY;
-    const h0 = rootRef.current?.getBoundingClientRect().height ?? height;
+    const h0 = (rootRef.current?.getBoundingClientRect().height ?? height) - extraH;
     const target = event.currentTarget;
     let next = h0;
     const move = (e: globalThis.PointerEvent) => {
@@ -424,50 +484,66 @@ export function Timeline({
         <div className="timeline__lanes" style={{ top: RULER_H }} />
         <canvas ref={gridRef} className="timeline__grid" />
 
-        <div className="timeline__markers" style={{ top: RULER_H, height: MARKERS_H }}>
-          {items.map((item) => {
-            const isRange = item.frameEnd > item.frameStart;
-            const x0 = isRange ? xOf(item.frameStart) : xOf(item.frameStart + 0.5);
-            const w = isRange ? Math.max(4, Math.min(xOf(item.frameEnd + 1), xOf(count)) - x0) : 0;
-            if (item.frameStart >= count || x0 + w < -12 || x0 > width + 12) return null;
-            const selected = item.id === selectedId;
-            const number = rank.get(item.id) ?? 0;
-            const first = item.comment.split("\n")[0] ?? "";
-            const tip = `#${number} · ${t(`kind.${item.kind}`)} · ${t(`status.${item.status}`)}${first ? ` — ${first}` : ""}`;
-            return (
-              <Tooltip key={item.id} tip={tip}>
-                <button
-                  type="button"
-                  tabIndex={-1}
-                  aria-label={tip}
-                  data-marker={item.id}
-                  className={classigo("mk", markerStatusClass(item.status), {
-                    "mk--bar": isRange,
-                    "mk--tick": !isRange,
-                    "mk--region": item.kind === "region",
-                    "mk--selected": selected,
-                    "mk--dim": filter !== "all" && item.status !== filter,
-                  })}
-                  style={{ left: x0, width: isRange ? w : undefined }}
-                  onClick={() => onSelectItem(item)}
-                />
-              </Tooltip>
-            );
-          })}
-          {items.map((item) => {
-            if (item.id !== selectedId || item.frameStart >= count) return null;
-            const isRange = item.frameEnd > item.frameStart;
-            const x0 = isRange ? xOf(item.frameStart) : xOf(item.frameStart + 0.5);
-            const w = isRange ? Math.max(4, Math.min(xOf(item.frameEnd + 1), xOf(count)) - x0) : 0;
-            return (
-              <span key={item.id} className="mk__num" style={{ left: Math.max(x0, 0) + w + 8 }}>
-                #{rank.get(item.id)}
-              </span>
-            );
-          })}
+        <div
+          ref={markersRef}
+          className="timeline__markers"
+          style={{ top: RULER_H, height: markersH }}
+        >
+          <div className="timeline__markers-in" style={{ height: contentH }}>
+            {items.map((item) => {
+              const isRange = item.frameEnd > item.frameStart;
+              const x0 = isRange ? xOf(item.frameStart) : xOf(item.frameStart + 0.5);
+              const w = isRange
+                ? Math.max(4, Math.min(xOf(item.frameEnd + 1), xOf(count)) - x0)
+                : 0;
+              if (item.frameStart >= count || x0 + w < -12 || x0 > width + 12) return null;
+              const offset = laneOffset(packing.lanes.get(item.id) ?? 0, packing.count);
+              const selected = item.id === selectedId;
+              const number = rank.get(item.id) ?? 0;
+              const first = item.comment.split("\n")[0] ?? "";
+              const tip = `#${number} · ${t(`kind.${item.kind}`)} · ${t(`status.${item.status}`)}${first ? ` — ${first}` : ""}`;
+              return (
+                <Tooltip key={item.id} tip={tip}>
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    aria-label={tip}
+                    data-marker={item.id}
+                    className={classigo("mk", markerStatusClass(item.status), {
+                      "mk--bar": isRange,
+                      "mk--tick": !isRange,
+                      "mk--region": item.kind === "region",
+                      "mk--selected": selected,
+                      "mk--dim": filter !== "all" && item.status !== filter,
+                    })}
+                    style={{ left: x0, width: isRange ? w : undefined, marginTop: offset }}
+                    onClick={() => onSelectItem(item)}
+                  />
+                </Tooltip>
+              );
+            })}
+            {items.map((item) => {
+              if (item.id !== selectedId || item.frameStart >= count) return null;
+              const isRange = item.frameEnd > item.frameStart;
+              const x0 = isRange ? xOf(item.frameStart) : xOf(item.frameStart + 0.5);
+              const w = isRange
+                ? Math.max(4, Math.min(xOf(item.frameEnd + 1), xOf(count)) - x0)
+                : 0;
+              const offset = laneOffset(packing.lanes.get(item.id) ?? 0, packing.count);
+              return (
+                <span
+                  key={item.id}
+                  className="mk__num"
+                  style={{ left: Math.max(x0, 0) + w + 8, marginTop: offset }}
+                >
+                  #{rank.get(item.id)}
+                </span>
+              );
+            })}
+          </div>
         </div>
 
-        <div className="timeline__clip" style={{ top: CLIP_TOP, height: clipH }}>
+        <div className="timeline__clip" style={{ top: clipTop, height: clipH }}>
           <div
             className="timeline__clip-bar"
             style={{ left: xOf(0), width: xOf(count) - xOf(0) }}
@@ -481,7 +557,7 @@ export function Timeline({
         {audioH > 0 && waveOn && (
           <div
             className={classigo("timeline__audio", { "timeline__audio--none": !hasAudio })}
-            style={{ top: CLIP_TOP + clipH + LANE_GAP, height: audioH }}
+            style={{ top: clipTop + clipH + LANE_GAP, height: audioH }}
           >
             {hasAudio ? (
               <>

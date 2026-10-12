@@ -1,6 +1,7 @@
 import classigo from "classigo";
 import { matcher } from "matchigo";
-import { type PointerEvent, useRef, useState } from "react";
+import { type CSSProperties, type PointerEvent, useRef, useState } from "react";
+import { regionColor } from "../../core/regions";
 import type { Region } from "../../core/types";
 import { clamp } from "../frame";
 import { useT } from "../i18n";
@@ -13,19 +14,31 @@ import {
   regionPixels,
   resizeRegion,
 } from "../stage/region";
-import { Icon } from "../ui/Icon";
+import { IconButton } from "../ui/Button";
+import { Tooltip } from "../ui/Tooltip";
 
 interface RegionOverlayProps {
   video: { width: number; height: number };
-  region: Region | null;
+  regions: Region[];
   active: boolean;
-  onCommit: (region: Region) => void;
+  onChange: (regions: Region[]) => void;
 }
 
 type Gesture =
   | { kind: "draw"; origin: { x: number; y: number } }
-  | { kind: "move"; origin: { x: number; y: number }; start: Region }
-  | { kind: "resize"; origin: { x: number; y: number }; start: Region; handle: Handle };
+  | { kind: "move"; index: number; origin: { x: number; y: number }; start: Region }
+  | {
+      kind: "resize";
+      index: number;
+      origin: { x: number; y: number };
+      start: Region;
+      handle: Handle;
+    };
+
+interface Draft {
+  index: number | null;
+  region: Region;
+}
 
 const handleClass = matcher<Handle, string>()
   .with("nw", "region__h--nw")
@@ -38,11 +51,17 @@ const handleClass = matcher<Handle, string>()
   .with("w", "region__h--w")
   .exhaustive();
 
-export function RegionOverlay({ video, region, active, onCommit }: RegionOverlayProps) {
+function withDraft(regions: Region[], draft: Draft | null): Region[] {
+  if (!draft) return regions;
+  if (draft.index === null) return [...regions, draft.region];
+  return regions.map((region, index) => (index === draft.index ? draft.region : region));
+}
+
+export function RegionOverlay({ video, regions, active, onChange }: RegionOverlayProps) {
   const t = useT();
   const rootRef = useRef<HTMLDivElement>(null);
   const gesture = useRef<Gesture | null>(null);
-  const [draft, setDraft] = useState<Region | null>(null);
+  const [draft, setDraft] = useState<Draft | null>(null);
 
   const point = (event: PointerEvent<HTMLElement>) => {
     const bounds = rootRef.current?.getBoundingClientRect();
@@ -55,15 +74,18 @@ export function RegionOverlay({ video, region, active, onCommit }: RegionOverlay
 
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (!active || event.button !== 0) return;
+    const target = event.target as HTMLElement;
+    if (target.closest("[data-remove]")) return;
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
     const origin = point(event);
-    const target = event.target as HTMLElement;
+    const owner = target.closest<HTMLElement>("[data-region-index]");
+    const index = owner ? Number(owner.dataset.regionIndex) : -1;
+    const start = regions[index];
     const handle = target.dataset.handle as Handle | undefined;
-    if (region && handle) gesture.current = { kind: "resize", origin, start: region, handle };
-    else if (region && target.closest("[data-region]")) {
-      gesture.current = { kind: "move", origin, start: region };
-    } else gesture.current = { kind: "draw", origin };
+    if (start && handle) gesture.current = { kind: "resize", index, origin, start, handle };
+    else if (start) gesture.current = { kind: "move", index, origin, start };
+    else gesture.current = { kind: "draw", origin };
   };
 
   const onPointerMove = (event: PointerEvent<HTMLDivElement>) => {
@@ -72,20 +94,21 @@ export function RegionOverlay({ video, region, active, onCommit }: RegionOverlay
     const p = point(event);
     const dx = p.x - g.origin.x;
     const dy = p.y - g.origin.y;
-    if (g.kind === "draw") setDraft(drawRegion(g.origin, p));
-    else if (g.kind === "move") setDraft(moveRegion(g.start, dx, dy));
-    else setDraft(resizeRegion(g.start, g.handle, dx, dy));
+    if (g.kind === "draw") setDraft({ index: null, region: drawRegion(g.origin, p) });
+    else if (g.kind === "move") setDraft({ index: g.index, region: moveRegion(g.start, dx, dy) });
+    else setDraft({ index: g.index, region: resizeRegion(g.start, g.handle, dx, dy) });
   };
 
   const finish = (commit: boolean) => {
     const result = draft;
     gesture.current = null;
     setDraft(null);
-    if (commit && result && isUsable(result)) onCommit(result);
+    if (commit && result && isUsable(result.region)) onChange(withDraft(regions, result));
   };
 
-  const shown = draft ?? region;
-  const size = shown ? regionPixels(shown, video.width, video.height) : null;
+  const remove = (index: number) => onChange(regions.filter((_, i) => i !== index));
+
+  const shown = withDraft(regions, draft);
 
   return (
     <div
@@ -96,30 +119,52 @@ export function RegionOverlay({ video, region, active, onCommit }: RegionOverlay
       onPointerUp={() => finish(true)}
       onPointerCancel={() => finish(false)}
     >
-      {shown && size && (
-        <div
-          data-region=""
-          className="region"
-          style={{
-            left: `${shown.x * 100}%`,
-            top: `${shown.y * 100}%`,
-            width: `${shown.w * 100}%`,
-            height: `${shown.h * 100}%`,
-          }}
-        >
-          <span className="region__label num">
-            <Icon name="crop" size={12} />
-            {t("region.label", { w: size.w, h: size.h })}
-          </span>
-          {HANDLES.map((handle) => (
-            <i
-              key={handle}
-              data-handle={handle}
-              className={classigo("region__h", handleClass(handle))}
-            />
-          ))}
-        </div>
-      )}
+      {shown.map((region, index) => {
+        const color = regionColor(index);
+        const size = regionPixels(region, video.width, video.height);
+        return (
+          <div
+            // biome-ignore lint/suspicious/noArrayIndexKey: regions have no id, their order is their identity
+            key={index}
+            data-region=""
+            data-region-index={index}
+            className="region"
+            style={
+              {
+                "--rc": color.hex,
+                "--rc-ink": color.ink,
+                left: `${region.x * 100}%`,
+                top: `${region.y * 100}%`,
+                width: `${region.w * 100}%`,
+                height: `${region.h * 100}%`,
+              } as CSSProperties
+            }
+          >
+            <span className="region__label num">
+              {t("region.label", { n: index + 1, w: size.w, h: size.h })}
+              {active && (
+                <Tooltip tip={t("region.remove", { n: index + 1 })}>
+                  <IconButton
+                    icon="xmark"
+                    size="sm"
+                    className="region__remove"
+                    data-remove=""
+                    label={t("region.remove", { n: index + 1 })}
+                    onClick={() => remove(index)}
+                  />
+                </Tooltip>
+              )}
+            </span>
+            {HANDLES.map((handle) => (
+              <i
+                key={handle}
+                data-handle={handle}
+                className={classigo("region__h", handleClass(handle))}
+              />
+            ))}
+          </div>
+        );
+      })}
     </div>
   );
 }

@@ -20,7 +20,8 @@ export type Action =
   | "snap"
   | "verify"
   | "reopen"
-  | "copy";
+  | "copy"
+  | "mute";
 
 export interface KeyInput {
   key: string;
@@ -52,6 +53,7 @@ const resolve = compile<KeyInput, Action | null>([
   { with: { key: P.union("s", "S") }, then: "snap" },
   { with: { key: P.union("v", "V") }, then: "verify" },
   { with: { key: P.union("x", "X") }, then: "reopen" },
+  { with: { key: P.union("m", "M") }, then: "mute" },
   { otherwise: null },
 ]);
 
