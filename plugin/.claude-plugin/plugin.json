@@ -1,0 +1,10 @@
+{
+  "name": "framecue",
+  "version": "0.0.0",
+  "description": "framecue MCP server and the /framecue:review skill to fix the items of a video review",
+  "author": {
+    "name": "Wesley Cormier"
+  },
+  "repository": "https://github.com/wewesss/framecue",
+  "license": "MIT OR Apache-2.0"
+}

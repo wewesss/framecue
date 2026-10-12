@@ -1,0 +1,14 @@
+{
+  "name": "framecue",
+  "description": "framecue: review a video in the browser, hand the fixes to Claude Code",
+  "owner": {
+    "name": "Wesley Cormier"
+  },
+  "plugins": [
+    {
+      "name": "framecue",
+      "source": "./plugin",
+      "description": "framecue MCP server and the /framecue:review skill to fix the items of a video review"
+    }
+  ]
+}

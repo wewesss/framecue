@@ -94,6 +94,17 @@ Only the user sets `verified` (or reopens an item), in the player. No tool can v
 
 Both the player and the MCP process write `queue.jsonl`; writes are serialised across processes with a `queue.lock` file in the workspace.
 
+### Claude Code plugin
+
+The plugin bundles the MCP server and a review skill. Install it once:
+
+```
+/plugin marketplace add wewesss/framecue
+/plugin install framecue@framecue
+```
+
+When the review is done, run `/framecue:review` in the project folder. Claude Code takes each waiting item, fixes it, re-renders when the project has a render command, and marks it fixed. The MCP server finds the workspace by searching upward from the current folder. On Windows, if `npx` is not found, see the `npx.cmd` note above.
+
 ## Requirements
 
 - Node.js 22 or later, or Bun 1.4 or later
