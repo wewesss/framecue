@@ -7,6 +7,7 @@ import type { Item } from "./types";
 
 export const POLL_MS = 250;
 export const QUIET_MS = 1000;
+export const HEARTBEAT_MS = 1000;
 const MISSING_GIVE_UP_MS = 30_000;
 
 export interface RenderSource {
@@ -116,6 +117,7 @@ async function readable(path: string): Promise<boolean> {
 export interface WatchOptions {
   pollMs?: number;
   quietMs?: number;
+  heartbeatMs?: number;
 }
 
 export function createFsRenderSource(path: string, options: WatchOptions = {}): RenderSource {
@@ -163,17 +165,46 @@ export function createFsRenderSource(path: string, options: WatchOptions = {}): 
     }
   };
 
+  const dir = dirname(path);
+  const dirIdentity = (): string | null => {
+    try {
+      const s = statSync(dir);
+      return `${s.dev}:${s.ino}:${s.birthtimeMs}`;
+    } catch {
+      return null;
+    }
+  };
   let watcher: ReturnType<typeof watch> | null = null;
-  try {
-    watcher = watch(dirname(path), { persistent: true }, (_event, filename) => {
-      if (closed || !eventTargets(filename, target)) return;
-      tracker.touch();
-      schedule();
-    });
-    watcher.on("error", () => undefined);
-  } catch {
+  let watchedDir: string | null = null;
+  const arm = () => {
+    watcher?.close();
     watcher = null;
-  }
+    watchedDir = dirIdentity();
+    if (watchedDir === null) return;
+    try {
+      watcher = watch(dir, { persistent: true }, (_event, filename) => {
+        if (closed || !eventTargets(filename, target)) return;
+        tracker.touch();
+        schedule();
+      });
+      watcher.on("error", () => {
+        watcher?.close();
+        watcher = null;
+      });
+    } catch {
+      watcher = null;
+    }
+  };
+  arm();
+
+  // The watched directory can be deleted and recreated by render pipelines, which silently kills fs.watch.
+  const heartbeat = setInterval(() => {
+    if (closed) return;
+    if (watcher === null || dirIdentity() !== watchedDir) arm();
+    tracker.touch();
+    schedule();
+  }, options.heartbeatMs ?? HEARTBEAT_MS);
+  heartbeat.unref?.();
 
   return {
     onRender(cb) {
@@ -185,6 +216,7 @@ export function createFsRenderSource(path: string, options: WatchOptions = {}): 
     close() {
       closed = true;
       listeners.clear();
+      clearInterval(heartbeat);
       if (timer !== null) clearTimeout(timer);
       timer = null;
       watcher?.close();
