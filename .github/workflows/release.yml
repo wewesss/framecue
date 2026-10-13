@@ -73,6 +73,8 @@ jobs:
           bun-version: 1.4.2
 
       # npm CLI rather than bun publish: bun emits no provenance attestation.
+      # Trusted publishing on npmjs.com matches this filename and the npm environment;
+      # renaming either breaks the publish until npmjs.com is updated. Needs npm >= 11.5.1.
       - uses: actions/setup-node@v7
         with:
           node-version: "24"
@@ -82,9 +84,7 @@ jobs:
       - run: bun install --frozen-lockfile
 
       - name: Publish to npm
-        run: npm publish --access public --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public --loglevel verbose
 
       - name: Tag and create the GitHub release
         env:
