@@ -286,10 +286,10 @@ describe("workspace resolution", () => {
     );
   });
 
-  test("the CLI reports a missing workspace on stderr only", async () => {
+  test("the CLI reports a missing explicit workspace on stderr only", async () => {
     const empty = await mkdtemp(join(tmpdir(), "framecue-nows-"));
     try {
-      const proc = Bun.spawn([process.execPath, cli, "mcp"], {
+      const proc = Bun.spawn([process.execPath, cli, "mcp", empty], {
         cwd: empty,
         stdout: "pipe",
         stderr: "pipe",
@@ -301,9 +301,27 @@ describe("workspace resolution", () => {
       ]);
       expect(code).toBe(1);
       expect(out).toBe("");
-      expect(err).toContain("No .framecue folder found");
+      expect(err).toContain("No .framecue folder in");
     } finally {
       await rm(empty, { recursive: true, force: true });
     }
   });
+});
+
+describe("framecue mcp without a workspace", () => {
+  test("starts anyway and reports the missing workspace per call", async () => {
+    const empty = await mkdtemp(join(tmpdir(), "framecue-mcp-empty-"));
+    const lonely = new Client({ name: "framecue-test", version: "0.0.0" });
+    try {
+      await lonely.connect(
+        new StdioClientTransport({ command: process.execPath, args: [cli, "mcp"], cwd: empty }),
+      );
+      const result = await lonely.callTool({ name: "list_items", arguments: {} });
+      expect(result.isError).toBe(true);
+      expect(contentOf(result)[0]?.text).toContain("No .framecue folder found");
+    } finally {
+      await lonely.close();
+      await rm(empty, { recursive: true, force: true });
+    }
+  }, 30_000);
 });
