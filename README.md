@@ -1,4 +1,6 @@
-# framecue
+<p align="center"><img src="docs/logo.svg" alt="" width="48" height="60"></p>
+
+<h1 align="center">framecue</h1>
 
 A local web video player to pick frames, frame ranges or regions, comment on them, and hand them to a coding agent (Claude Code, Codex, any) as a prioritised review queue. After a re-render, each fix is checked against the new video.
 
