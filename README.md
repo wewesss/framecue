@@ -130,6 +130,10 @@ Install the tools:
 - macOS: `brew install ffmpeg node` (or `brew install oven-sh/bun/bun`)
 - Debian/Ubuntu: `sudo apt install ffmpeg`, plus Node.js (NodeSource or nvm) or Bun (`curl -fsSL https://bun.sh/install | bash`)
 
+## Sponsor
+
+framecue is free and open source. If it saves you time, you can support it on [GitHub Sponsors](https://github.com/sponsors/wewesss) or [Open Collective](https://opencollective.com/miralabs-tech).
+
 ## Licence
 
 Licensed under either of MIT or Apache-2.0 at your option.

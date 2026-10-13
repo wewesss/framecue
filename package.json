@@ -1,6 +1,6 @@
 {
   "name": "framecue",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": false,
   "type": "module",
   "license": "MIT OR Apache-2.0",
@@ -8,6 +8,16 @@
     "type": "git",
     "url": "git+https://github.com/wewesss/framecue.git"
   },
+  "funding": [
+    {
+      "type": "github",
+      "url": "https://github.com/sponsors/wewesss"
+    },
+    {
+      "type": "opencollective",
+      "url": "https://opencollective.com/miralabs-tech"
+    }
+  ],
   "bin": {
     "framecue": "dist/cli.js"
   },
