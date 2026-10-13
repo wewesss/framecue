@@ -69,11 +69,19 @@ function toolError(message: string): CallToolResult {
   return { isError: true, content: [{ type: "text", text: message }] };
 }
 
-export function createFramecueServer(root: string): McpServer {
+export function createFramecueServer(source: string | (() => string)): McpServer {
   const server = new McpServer({ name: "framecue", version: pkg.version });
+  const workspace = (): string | CallToolResult => {
+    if (typeof source === "string") return source;
+    try {
+      return source();
+    } catch (error) {
+      return toolError(error instanceof Error ? error.message : String(error));
+    }
+  };
   const videoCache = new Map<string, ExportContext["video"]>();
 
-  const context = async (items: Item[]): Promise<ExportContext> => {
+  const context = async (root: string, items: Item[]): Promise<ExportContext> => {
     const first = items[0];
     const path = first?.video.path ?? "";
     let video = videoCache.get(path);
@@ -95,8 +103,8 @@ export function createFramecueServer(root: string): McpServer {
     return { video, workspace: root, ranks: rankMap(items) };
   };
 
-  const itemDetails = async (all: Item[], item: Item): Promise<CallToolResult> => {
-    const ctx = await context(all);
+  const itemDetails = async (root: string, all: Item[], item: Item): Promise<CallToolResult> => {
+    const ctx = await context(root, all);
     const ranks = ctx.ranks as Map<string, number>;
     const content: CallToolResult["content"] = [
       { type: "text", text: itemMarkdown(ctx, item, ranks.get(item.id) ?? 0) },
@@ -151,6 +159,8 @@ export function createFramecueServer(root: string): McpServer {
       annotations: { readOnlyHint: true },
     },
     async ({ status }) => {
+      const root = workspace();
+      if (typeof root !== "string") return root;
       const all = await readQueue(root);
       const ranks = rankMap(all);
       const items = all
@@ -171,10 +181,12 @@ export function createFramecueServer(root: string): McpServer {
       annotations: { readOnlyHint: true },
     },
     async () => {
+      const root = workspace();
+      if (typeof root !== "string") return root;
       const all = await readQueue(root);
       const next = defaultExportSet(all)[0];
       if (!next) return text("Queue empty: no item is todo or reopened.");
-      return itemDetails(all, next);
+      return itemDetails(root, all, next);
     },
   );
 
@@ -188,10 +200,12 @@ export function createFramecueServer(root: string): McpServer {
       annotations: { readOnlyHint: true },
     },
     async ({ id }) => {
+      const root = workspace();
+      if (typeof root !== "string") return root;
       const all = await readQueue(root);
       const item = all.find((it) => it.id === id);
       if (!item) return toolError(`Item not found: ${id}`);
-      return itemDetails(all, item);
+      return itemDetails(root, all, item);
     },
   );
 
@@ -208,6 +222,8 @@ export function createFramecueServer(root: string): McpServer {
       outputSchema: { item: summarySchema },
     },
     async ({ id, note }) => {
+      const root = workspace();
+      if (typeof root !== "string") return root;
       try {
         const updated = await updateItem(
           root,
@@ -237,10 +253,11 @@ export function createFramecueServer(root: string): McpServer {
   return server;
 }
 
-export async function runMcp(root: string): Promise<void> {
-  const server = createFramecueServer(root);
+export async function runMcp(source: string | (() => string)): Promise<void> {
+  const server = createFramecueServer(source);
   const transport = new StdioServerTransport();
   transport.onclose = () => process.exit(0);
   await server.connect(transport);
-  console.error(`framecue mcp: serving ${root}`);
+  if (typeof source === "string") console.error(`framecue mcp: serving ${source}`);
+  else console.error("framecue mcp: workspace resolved on each call");
 }

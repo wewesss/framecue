@@ -75,7 +75,12 @@ if (first === "mcp") {
   try {
     const { resolveMcpWorkspace } = await import("./mcp/workspace");
     const { runMcp } = await import("./mcp/server");
-    await runMcp(resolveMcpWorkspace({ path: extra[0], dir: values.dir, cwd: process.cwd() }));
+    const target = { path: extra[0], dir: values.dir, cwd: process.cwd() };
+    await runMcp(
+      target.path || target.dir
+        ? resolveMcpWorkspace(target)
+        : () => resolveMcpWorkspace({ cwd: process.cwd() }),
+    );
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);
