@@ -1,4 +1,4 @@
-<p align="center"><img src="docs/logo.svg" alt="" width="48" height="60"></p>
+<p align="center"><img src=".github/assets/logo.svg" alt="" width="48" height="60"></p>
 
 <h1 align="center">framecue</h1>
 
