@@ -103,7 +103,20 @@ The plugin bundles the MCP server and a review skill. Install it once:
 /plugin install framecue@framecue
 ```
 
-When the review is done, run `/framecue:review` in the project folder. Claude Code takes each waiting item, fixes it, re-renders when the project has a render command, and marks it fixed. The MCP server finds the workspace by searching upward from the current folder. On Windows, if `npx` is not found, see the `npx.cmd` note above.
+When the review is done, run `/framecue:review` in the project folder. Claude Code takes each waiting item, fixes it, re-renders when the project has a render command, and marks it fixed. The MCP server finds the workspace by searching upward from the current folder. Run `/framecue:help` for the commands and the review flow.
+
+The plugin runs its own embedded copy of the server with Bun (`bun` must be on PATH), so it needs no npm install.
+
+Local install, from a clone:
+
+```
+bun install
+bun run build
+claude plugin marketplace add <path-to-clone>
+claude plugin install framecue@framecue
+```
+
+Rebuild with `bun run build:plugin` after changing the sources, then `claude plugin update framecue@framecue`.
 
 ## Requirements
 

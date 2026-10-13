@@ -17,7 +17,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "bun run build:web && bun run build:cli",
+    "build": "bun run build:web && bun run build:cli && bun run build:plugin",
     "start": "bun src/cli.ts",
     "dev:server": "bun src/cli.ts --no-open --dev",
     "check": "biome check .",
@@ -26,6 +26,7 @@
     "test": "bun test",
     "build:web": "vite build",
     "build:cli": "bun build src/cli.ts --target node --format esm --packages external --outdir dist --minify-syntax",
+    "build:plugin": "bun tools/build-plugin.ts",
     "prepack": "bun run build",
     "test:node": "node tests/node-smoke.mjs",
     "test:bun-dist": "node tests/node-smoke.mjs --runtime bun"
