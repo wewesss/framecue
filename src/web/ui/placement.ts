@@ -37,8 +37,11 @@ export function placeTip(target: Box, tip: Size, viewport: Size): TipPosition {
 
 export type Align = "left" | "right";
 
+export type Side = "below" | "above";
+
 export interface AnchoredPosition {
-  top: number;
+  top?: number;
+  bottom?: number;
   left?: number;
   right?: number;
 }
@@ -47,9 +50,14 @@ export function anchoredPosition(
   anchor: Box,
   align: Align,
   viewportWidth: number,
+  side: Side = "below",
+  viewportHeight = 0,
 ): AnchoredPosition {
-  const top = anchor.top + anchor.height + MENU_GAP;
+  const vertical =
+    side === "above"
+      ? { bottom: viewportHeight - anchor.top + MENU_GAP }
+      : { top: anchor.top + anchor.height + MENU_GAP };
   if (align === "right")
-    return { top, right: Math.max(8, viewportWidth - anchor.left - anchor.width) };
-  return { top, left: Math.max(8, anchor.left) };
+    return { ...vertical, right: Math.max(8, viewportWidth - anchor.left - anchor.width) };
+  return { ...vertical, left: Math.max(8, anchor.left) };
 }

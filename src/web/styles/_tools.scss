@@ -118,3 +118,17 @@
     min-width: 46px;
   }
 }
+
+@container tools (max-width: 420px) {
+  .tools {
+    gap: 8px;
+  }
+
+  .tools__read {
+    display: none;
+  }
+
+  .ov {
+    min-width: 32px;
+  }
+}

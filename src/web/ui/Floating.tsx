@@ -9,11 +9,12 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
-import { type Align, type AnchoredPosition, anchoredPosition } from "./placement";
+import { type Align, type AnchoredPosition, anchoredPosition, type Side } from "./placement";
 
 interface FloatingProps {
   anchor: RefObject<HTMLElement | null>;
   align?: Align;
+  side?: Side;
   role: "menu" | "dialog";
   label: string;
   className?: string;
@@ -26,6 +27,7 @@ interface FloatingProps {
 export function Floating({
   anchor,
   align = "left",
+  side = "below",
   role,
   label,
   className,
@@ -48,9 +50,11 @@ export function Floating({
         { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
         align,
         window.innerWidth,
+        side,
+        window.innerHeight,
       ),
     );
-  }, [anchor, align]);
+  }, [anchor, align, side]);
 
   const placed = position !== null;
 
