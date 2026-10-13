@@ -214,6 +214,8 @@ export function App() {
         comment: "",
       });
       setItems(await api.items());
+      setSelection(emptySelection);
+      setRegionMode(false);
       setFilter("all");
       setSelectedId(created.id);
       setFocusId(created.id);
