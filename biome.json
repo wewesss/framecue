@@ -7,7 +7,7 @@
   },
   "files": {
     "ignoreUnknown": false,
-    "includes": ["**", "!**/dist", "!**/node_modules", "!docs/mockup"]
+    "includes": ["**", "!**/dist", "!**/node_modules", "!docs/mockup", "!plugin/server"]
   },
   "formatter": {
     "enabled": true,

@@ -1,8 +1,8 @@
 {
   "mcpServers": {
     "framecue": {
-      "command": "npx",
-      "args": ["-y", "framecue", "mcp"]
+      "command": "bun",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/server/framecue.js", "mcp"]
     }
   }
 }

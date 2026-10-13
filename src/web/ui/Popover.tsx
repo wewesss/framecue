@@ -1,13 +1,14 @@
 import classigo from "classigo/lite";
 import type { ReactNode, RefObject } from "react";
 import { Floating } from "./Floating";
-import type { Align } from "./placement";
+import type { Align, Side } from "./placement";
 
 interface PopoverProps {
   open: boolean;
   anchor: RefObject<HTMLElement | null>;
   label: string;
   align?: Align;
+  side?: Side;
   className?: string;
   autoFocus?: string;
   onClose: () => void;
@@ -19,6 +20,7 @@ export function Popover({
   anchor,
   label,
   align = "left",
+  side,
   className,
   autoFocus,
   onClose,
@@ -29,6 +31,7 @@ export function Popover({
     <Floating
       anchor={anchor}
       align={align}
+      side={side}
       role="dialog"
       label={label}
       className={classigo("popover", className)}

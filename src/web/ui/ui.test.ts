@@ -111,6 +111,10 @@ describe("placement", () => {
     const anchor = { top: 10, left: 300, width: 40, height: 28 };
     expect(anchoredPosition(anchor, "left", 1000)).toEqual({ top: 44, left: 300 });
     expect(anchoredPosition(anchor, "right", 1000)).toEqual({ top: 44, right: 660 });
+    expect(anchoredPosition(anchor, "left", 1000, "above", 800)).toEqual({
+      bottom: 796,
+      left: 300,
+    });
   });
 });
 

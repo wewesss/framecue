@@ -1,11 +1,12 @@
 import classigo from "classigo";
-import { type KeyboardEvent, useState } from "react";
+import { type KeyboardEvent, useRef, useState } from "react";
 import { formatTimecode } from "../frame";
 import { useT } from "../i18n";
 import type { Selection } from "../types";
 import { Button, IconButton } from "../ui/Button";
 import { Icon } from "../ui/Icon";
 import { Kbd } from "../ui/Kbd";
+import { Popover } from "../ui/Popover";
 import { Tooltip } from "../ui/Tooltip";
 import type { Volume } from "../volume";
 
@@ -35,6 +36,28 @@ function parseFrame(text: string): number | null {
   return Number.isNaN(value) ? null : value;
 }
 
+interface VolumeSliderProps {
+  silent: boolean;
+  level: number;
+  label: string;
+  onVolume: (level: number) => void;
+}
+
+function VolumeSlider({ silent, level, label, onVolume }: VolumeSliderProps) {
+  return (
+    <input
+      className="volume__slider"
+      type="range"
+      min={0}
+      max={1}
+      step={0.01}
+      aria-label={label}
+      value={silent ? 0 : level}
+      onChange={(event) => onVolume(Number.parseFloat(event.target.value))}
+    />
+  );
+}
+
 export function Transport({
   frame,
   fps,
@@ -57,6 +80,8 @@ export function Transport({
 }: TransportProps) {
   const t = useT();
   const [draft, setDraft] = useState<string | null>(null);
+  const [volumeOpen, setVolumeOpen] = useState(false);
+  const volumeAnchor = useRef<HTMLButtonElement>(null);
   const last = Math.max(frameCount - 1, 0);
   const shift = t("key.shift");
 
@@ -108,6 +133,7 @@ export function Transport({
         <div className="volume">
           <Tooltip tip={silent ? t("transport.unmute") : t("transport.mute")} keys={["M"]}>
             <IconButton
+              className="volume__mute"
               icon={silent ? "speaker.slash" : "speaker.wave.2"}
               label={silent ? t("transport.unmute") : t("transport.mute")}
               size="sm"
@@ -115,16 +141,48 @@ export function Transport({
               onClick={onToggleMute}
             />
           </Tooltip>
-          <input
-            className="volume__slider"
-            type="range"
-            min={0}
-            max={1}
-            step={0.01}
-            aria-label={t("transport.volume")}
-            value={silent ? 0 : volume.level}
-            onChange={(event) => onVolume(Number.parseFloat(event.target.value))}
+          <Tooltip tip={t("transport.volume")} keys={["M"]}>
+            <IconButton
+              ref={volumeAnchor}
+              className="volume__open"
+              icon={silent ? "speaker.slash" : "speaker.wave.2"}
+              label={t("transport.volume")}
+              size="sm"
+              pressed={volumeOpen}
+              aria-haspopup="dialog"
+              aria-expanded={volumeOpen}
+              onClick={() => setVolumeOpen((open) => !open)}
+            />
+          </Tooltip>
+          <VolumeSlider
+            silent={silent}
+            level={volume.level}
+            label={t("transport.volume")}
+            onVolume={onVolume}
           />
+          <Popover
+            open={volumeOpen}
+            anchor={volumeAnchor}
+            side="above"
+            label={t("transport.volume")}
+            className="popover--volume"
+            autoFocus=".volume__slider"
+            onClose={() => setVolumeOpen(false)}
+          >
+            <IconButton
+              icon={silent ? "speaker.slash" : "speaker.wave.2"}
+              label={silent ? t("transport.unmute") : t("transport.mute")}
+              size="sm"
+              pressed={silent}
+              onClick={onToggleMute}
+            />
+            <VolumeSlider
+              silent={silent}
+              level={volume.level}
+              label={t("transport.volume")}
+              onVolume={onVolume}
+            />
+          </Popover>
         </div>
       </div>
 
