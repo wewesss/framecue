@@ -12,7 +12,7 @@ if (!(await Bun.file(join(webSrc, "index.html")).exists())) {
 
 const result = await Bun.build({
   entrypoints: [join(root, "src", "cli.ts")],
-  target: "bun",
+  target: "node",
   format: "esm",
   minify: true,
   outdir,

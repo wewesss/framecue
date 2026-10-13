@@ -105,7 +105,7 @@ Update it with `claude plugin marketplace update framecue`, then `claude plugin 
 
 When the review is done, run `/framecue:review` in the project folder. Claude Code takes each waiting item, fixes it, re-renders when the project has a render command, and marks it fixed. The MCP server finds the workspace by searching upward from the current folder. Run `/framecue:help` for the commands and the review flow.
 
-The plugin runs its own embedded copy of the server with Bun (`bun` must be on PATH), so it needs no npm install.
+The plugin runs its own embedded copy of the server with Node.js (`node` 22 or later must be on PATH), so it needs no npm install.
 
 Local install, from a clone:
 
