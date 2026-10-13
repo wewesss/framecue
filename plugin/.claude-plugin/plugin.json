@@ -1,6 +1,6 @@
 {
   "name": "framecue",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "framecue MCP server and the /framecue:review skill to fix the items of a video review",
   "author": {
     "name": "Wesley Cormier"
