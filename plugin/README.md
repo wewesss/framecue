@@ -11,7 +11,7 @@ claude plugin marketplace add wewesss/framecue
 claude plugin install framecue@framecue
 ```
 
-Requirements: `bun` on PATH (the plugin runs its embedded framecue server with Bun) and `ffmpeg`.
+Requirements: Node.js 22 or later on PATH (the plugin runs its embedded framecue server with `node`) and `ffmpeg`.
 
 ## What it adds
 
