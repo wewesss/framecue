@@ -6,8 +6,6 @@ Nothing leaves your machine: the server binds to 127.0.0.1 and there is no telem
 
 ## Install
 
-Not published to npm yet. Once it is:
-
 ```
 npx framecue <video>
 npm i -g framecue
@@ -15,7 +13,7 @@ bunx framecue <video>
 bun add -g framecue
 ```
 
-Until then, run it from source:
+From source:
 
 ```
 git clone https://github.com/wewesss/framecue.git
@@ -96,12 +94,14 @@ Both the player and the MCP process write `queue.jsonl`; writes are serialised a
 
 ### Claude Code plugin
 
-The plugin bundles the MCP server and a review skill. Install it once:
+The plugin bundles the MCP server and a review skill. Install it once, from a terminal (not inside a Claude Code session):
 
 ```
-/plugin marketplace add wewesss/framecue
-/plugin install framecue@framecue
+claude plugin marketplace add wewesss/framecue
+claude plugin install framecue@framecue
 ```
+
+Update it with `claude plugin marketplace update framecue`, then `claude plugin update framecue@framecue`.
 
 When the review is done, run `/framecue:review` in the project folder. Claude Code takes each waiting item, fixes it, re-renders when the project has a render command, and marks it fixed. The MCP server finds the workspace by searching upward from the current folder. Run `/framecue:help` for the commands and the review flow.
 
