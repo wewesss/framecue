@@ -15,12 +15,12 @@ Print the following to the user, adapted to their language.
 Run from the project folder:
 
 ```
-bun "${CLAUDE_PLUGIN_ROOT}/server/framecue.js" <video>
+node "${CLAUDE_PLUGIN_ROOT}/server/framecue.js" <video>
 ```
 
-Options: `--dir`, `--port`, `--no-open`. The player opens at http://127.0.0.1:5730 (next free port if taken). Requires bun 1.4+ and ffmpeg/ffprobe on PATH.
+Options: `--dir`, `--port`, `--no-open`. The player opens at http://127.0.0.1:5730 (next free port if taken). Requires Node.js 22+ and ffmpeg/ffprobe on PATH.
 
-Resolve CLAUDE_PLUGIN_ROOT yourself (it is the folder two levels above this SKILL.md) and show the absolute path to the user. Once framecue is published, `framecue <video>` works the same.
+Resolve CLAUDE_PLUGIN_ROOT yourself (it is the folder two levels above this SKILL.md) and show the absolute path to the user. `npx framecue <video>` works the same.
 
 ## Live mode
 
