@@ -85,18 +85,19 @@ describe("framecue mcp over stdio", () => {
     expect(client.getServerVersion()?.name).toBe("framecue");
   });
 
-  test("list_items text and structured content", async () => {
+  test("list_items returns text lines only", async () => {
     const all = await client.callTool({ name: "list_items", arguments: {} });
+    expect(all.structuredContent).toBeUndefined();
     const lines = (contentOf(all)[0]?.text ?? "").split("\n");
     expect(lines.length).toBe(3);
     expect(lines[0]).toContain(`#1 ${todoItem.id} frame frame 4`);
+    expect(lines[1]).toContain(`#2 ${rangeItem.id}`);
     expect(lines[1]).toContain("frames 10-30");
+    expect(lines[2]).toContain(`#3 ${verifiedItem.id}`);
     expect(lines[2]).toContain("[verified]");
-    const structured = all.structuredContent as { items: { id: string; rank: number }[] };
-    expect(structured.items.map((i) => i.id)).toEqual([todoItem.id, rangeItem.id, verifiedItem.id]);
 
     const todo = await client.callTool({ name: "list_items", arguments: { status: "todo" } });
-    expect((todo.structuredContent as { items: unknown[] }).items.length).toBe(2);
+    expect((contentOf(todo)[0]?.text ?? "").split("\n").length).toBe(2);
     const fixed = await client.callTool({ name: "list_items", arguments: { status: "fixed" } });
     expect(contentOf(fixed)[0]?.text).toBe("No matching item.");
   });
@@ -131,8 +132,9 @@ describe("framecue mcp over stdio", () => {
     expect(missing.isError).toBe(true);
   });
 
-  test("get_item lists every region in text and structured content", async () => {
+  test("get_item lists every region in text, without structured content", async () => {
     const result = await client.callTool({ name: "get_item", arguments: { id: verifiedItem.id } });
+    expect(result.structuredContent).toBeUndefined();
     const text = contentOf(result)[0]?.text ?? "";
     expect(text).toContain("- regions:");
     expect(text).toContain(
@@ -141,22 +143,11 @@ describe("framecue mcp over stdio", () => {
     expect(text).toContain(
       "  - region 2 (red): normalised 0–1 x=0.5 y=0.5 w=0.25 h=0.25; in source pixels (",
     );
-    const structured = result.structuredContent as {
-      item: {
-        id: string;
-        regions: { number: number; color: string; normalised: unknown; pixels: unknown }[];
-      };
-    };
-    expect(structured.item.id).toBe(verifiedItem.id);
-    expect(structured.item.regions.map((r) => [r.number, r.color])).toEqual([
-      [1, "blue"],
-      [2, "red"],
-    ]);
-    expect(structured.item.regions[1]?.normalised).toEqual({ x: 0.5, y: 0.5, w: 0.25, h: 0.25 });
-    expect(structured.item.regions[1]?.pixels).not.toBeNull();
+    expect(text).toContain(`- id: ${verifiedItem.id}`);
 
     const next = await client.callTool({ name: "next_item", arguments: {} });
-    expect((next.structuredContent as { item: { regions: unknown[] } }).item.regions).toEqual([]);
+    expect(next.structuredContent).toBeUndefined();
+    expect(contentOf(next)[0]?.text).not.toContain("- regions:");
   });
 
   test("mark_fixed: todo to fixed, then refused", async () => {
@@ -165,9 +156,11 @@ describe("framecue mcp over stdio", () => {
       arguments: { id: todoItem.id, note: "removed the logo layer" },
     });
     expect(ok.isError).toBeFalsy();
-    const item = (ok.structuredContent as { item: { status: string; agentNote: string } }).item;
-    expect(item.status).toBe("fixed");
-    expect(item.agentNote).toBe("removed the logo layer");
+    expect(ok.structuredContent).toBeUndefined();
+    expect(contentOf(ok)[0]?.text).toContain(`Marked fixed: #1 ${todoItem.id}`);
+    expect(contentOf(ok)[0]?.text).toContain("[fixed]");
+    const listed = await client.callTool({ name: "list_items", arguments: { status: "fixed" } });
+    expect(contentOf(listed)[0]?.text).toContain(todoItem.id);
 
     const again = await client.callTool({
       name: "mark_fixed",
