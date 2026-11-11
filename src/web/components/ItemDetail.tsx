@@ -413,7 +413,7 @@ function ItemForm({
                     </span>
                     <span className="cap__cap">
                       <b>{t(tile.label)}</b>
-                      <span className="num">{tile.sheet ? "3×3" : tile.frame}</span>
+                      <span className="num">{tile.sheet ? "4×4" : tile.frame}</span>
                     </span>
                   </button>
                 </Tooltip>
