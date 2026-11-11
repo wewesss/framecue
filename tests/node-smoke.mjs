@@ -238,7 +238,7 @@ async function main() {
       const listed = await client.callTool({ name: "list_items", arguments: {} });
       check(
         "MCP list_items",
-        listed.structuredContent?.items?.some((it) => it.id === item.id) === true,
+        listed.content?.[0]?.text?.includes(item.id) === true,
         JSON.stringify(listed),
       );
       const got = await client.callTool({ name: "get_item", arguments: { id: item.id } });
@@ -252,7 +252,7 @@ async function main() {
       });
       check(
         "MCP mark_fixed",
-        !fixed.isError && fixed.structuredContent?.item?.status === "fixed",
+        !fixed.isError && fixed.content?.[0]?.text?.includes("[fixed]") === true,
         JSON.stringify(fixed),
       );
     } finally {

@@ -13,7 +13,6 @@ import {
   probeVideo,
   rankMap,
   readQueue,
-  regionDetails,
   updateItem,
 } from "../core";
 
@@ -137,15 +136,7 @@ export function createFramecueServer(source: string | (() => string)): McpServer
     for (const rel of item.images) await attach("Before", rel);
     if (item.after) for (const rel of item.after.images) await attach("After", rel);
     if (notes.length > 0) content.push({ type: "text", text: notes.join("\n") });
-    return {
-      content,
-      structuredContent: {
-        item: {
-          ...summarise(item, ranks),
-          regions: regionDetails(item.regions, ctx.video),
-        },
-      },
-    };
+    return { content };
   };
 
   server.registerTool(
@@ -153,9 +144,8 @@ export function createFramecueServer(source: string | (() => string)): McpServer
     {
       title: "List review items",
       description:
-        "List the items of the framecue review queue, ordered by priority (rank #1 is the most urgent). Optionally filter by status: todo (waiting for a fix), fixed (marked fixed, waiting for the user to verify), verified (approved by the user), reopened (still wrong, needs another fix). Returns one line per item and the same data as structured content. Use get_item for the images.",
+        "List the items of the framecue review queue, ordered by priority (rank #1 is the most urgent). Optionally filter by status: todo (waiting for a fix), fixed (marked fixed, waiting for the user to verify), verified (approved by the user), reopened (still wrong, needs another fix). Returns one line per item. Use get_item for the images.",
       inputSchema: { status: STATUS.optional().describe("Only items with this status") },
-      outputSchema: { items: z.array(summarySchema) },
       annotations: { readOnlyHint: true },
     },
     async ({ status }) => {
@@ -167,7 +157,7 @@ export function createFramecueServer(source: string | (() => string)): McpServer
         .filter((it) => status === undefined || it.status === status)
         .map((it) => summarise(it, ranks));
       const body = items.length > 0 ? items.map(listLine).join("\n") : "No matching item.";
-      return { content: [{ type: "text", text: body }], structuredContent: { items } };
+      return text(body);
     },
   );
 
@@ -219,7 +209,6 @@ export function createFramecueServer(source: string | (() => string)): McpServer
         id: z.string().min(1).describe("Item id"),
         note: z.string().min(1).describe("What you changed, shown to the user"),
       },
-      outputSchema: { item: summarySchema },
     },
     async ({ id, note }) => {
       const root = workspace();
@@ -233,10 +222,7 @@ export function createFramecueServer(source: string | (() => string)): McpServer
         );
         const ranks = rankMap(await readQueue(root));
         const summary = summarise(updated, ranks);
-        return {
-          content: [{ type: "text", text: `Marked fixed: ${listLine(summary)}` }],
-          structuredContent: { item: summary },
-        };
+        return text(`Marked fixed: ${listLine(summary)}`);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         if (message.startsWith("Invalid status transition")) {
